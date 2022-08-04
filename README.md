@@ -18,6 +18,6 @@ As you can see the image is rendered using small lights source
 
 Tested on a 60 Hz screen with a NVIDIA GeForce GTX 970M without any rendering hierarchy.
 
-| Object count | 1000 |
-| --- | --- |
-| FPS | 60 |
+| Object count | 1 000 | 100 000
+| --- | --- | --- |
+| FPS Average | 60 | 60 |
