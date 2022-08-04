@@ -11,7 +11,27 @@ No external libraries are needed to run this program.
 3. Open the [HTML](https://github.com/AntoineBRTL/Real-Time-Path-Tracer/blob/main/test/index.html) in your browser
 
 ## How to use
-1. Import the renderer
+1. Import `PathTracerRenderer`
 ```javascript
 import { PathTracerRenderer } from "../src/PathTracerRenderer.js";
+```
+
+2. Create a `Canvas` for the renderer
+```javascript
+let canvas = document.createElement("canvas");
+document.body.appendChild(canvas);
+```
+
+3. Init a new `PathTracerRenderer`
+```javascript
+let renderer = new PathTracerRenderer(canvas, "../src/shader/PathTracer.vert", "../src/shader/PathTracer.frag", callback);
+```
+
+4. Render inside `callback`
+```javascript
+function callback()
+{
+    renderer.render();
+    window.requestAnimationFrame(callback);
+}
 ```
