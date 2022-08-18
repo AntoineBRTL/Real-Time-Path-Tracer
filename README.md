@@ -1,7 +1,7 @@
 # Real-Time-Path-Tracer
 Fast high fidelity ray-tracing rendering program.
 
-This program is written in Javascript and GLSL, and can be run from a browser or any browser-like libraries from Node-JS like [Electron](https://www.electronjs.org/).
+This program is written in Javascript and GLSL, and can be run in a browser or any browser-like libraries from Node-JS like [Electron](https://www.electronjs.org/).
 
 No external libraries are needed to run this program.
 
