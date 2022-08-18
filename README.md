@@ -11,7 +11,7 @@ No external libraries are needed to run this program.
 3. Open the [HTML](https://github.com/AntoineBRTL/Real-Time-Path-Tracer/blob/main/test/index.html) file in your browser.
 4. You may have to run a small server, see [here](https://www.npmjs.com/package/live-server).
 
-What we get: ![alt text](./Demo.PNG)
+What we get: ![alt text](./demo.PNG)
 
 As you can see the image is rendered using small lights source.
 
