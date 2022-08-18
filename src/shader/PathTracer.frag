@@ -44,7 +44,9 @@ struct Camera
     float focalLength;
 };
 
-out vec4 fragColor;
+// output buffers
+layout(location = 0) out vec4 out1;
+layout(location = 1) out vec4 out2;
 
 in mat4 cameraRotationMatrix;
 uniform float cameraPositionX;
@@ -59,13 +61,14 @@ uniform float height;
 uniform float random1;
 uniform float random2;
 
-uniform sampler2D previousFrame;
+uniform sampler2D texture0;
+uniform sampler2D texture1;
 uniform int renderTime;
 
 const int SPHERE_COUNT = 2;
 const int PLANE_COUNT = 8;
 const float EPSILON = 1e-6;
-const int MAX_BOUNCE = 500;
+const int MAX_BOUNCE = 5;
 
 Sphere spheres[SPHERE_COUNT];
 Plane planes[PLANE_COUNT];
@@ -146,7 +149,7 @@ Hit rayHit(Ray ray)
 
         float delta = pow(b, 2.0) - 4.0 * c;
 
-        if(delta <= 0.0)
+        if(delta < 0.0)
         {
             // no intersection at all 
             continue;
@@ -278,10 +281,13 @@ vec3 rayColor(Ray ray)
     {
         Hit hit = rayHit(ray);
 
+        // intersection info 
+        out2 = vec4(vec3(float(i) / float(MAX_BOUNCE)), 1.0);
+
         if(!hit.hit)
         {
             // color *= vec3(0.5, 0.7, 1.0);
-            color *= vec3(0.01);
+            color *= vec3(.01);
             break;
         }
 
@@ -304,8 +310,8 @@ vec3 rayColor(Ray ray)
 
 vec3 averageColor(vec3 color)
 {
-    vec3 previousPixel = texture(previousFrame, vec2(gl_FragCoord.x / width, gl_FragCoord.y / height)).xyz;
-    float averageDensity = 1.0;
+    vec3 previousPixel = texture(texture0, vec2(gl_FragCoord.x / width, gl_FragCoord.y / height)).xyz;
+    float averageDensity = 2.0;
 
     return (sqrt(color) + previousPixel * length(previousPixel) * (float(renderTime) * 1.0/averageDensity)) / (1.0 + length(previousPixel) * (float(renderTime) * 1.0/averageDensity));
     /*float maxRGB = max(previousPixel.x, max(previousPixel.y, previousPixel.z));
@@ -332,25 +338,27 @@ void main()
     Camera camera = Camera(vec3(cameraPositionX, cameraPositionY, cameraPositionZ), 1.0);
     Ray ray = getRay(camera);
 
-    spheres[0] = Sphere(vec3(0.0, 0.0, 0.0), 0.5, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
-    //spheres[1] = Sphere(vec3(0.0, 0.05, 0.0), 0.45, Material(vec3(0.2, 0.2, 0.8), vec3(0.0, 0.0, 5.0), 0.0, 0.0));
-    planes[0] = Plane(vec3(0.0, -0.5, 0.0), vec3(0.0, 1.0, 0.0), 2.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
-    planes[1] = Plane(vec3(0.0, 1.5, -2.0), vec3(0.0, 0.0, 1.0), 2.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
-    planes[2] = Plane(vec3(2.0, 1.5, 0.0), vec3(-1.0, 0.0, 0.0), 2.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
-    planes[3] = Plane(vec3(1.99, 0.5, 0.0), vec3(-1.0, 0.0, 0.0), 1.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.2, 0.2, 4.0), 0.0, 0.0));
-    planes[4] = Plane(vec3(-2.0, 1.5, 0.0), vec3(1.0, 0.0, 0.0), 2.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
-    planes[5] = Plane(vec3(-1.99, 0.5, 0.0), vec3(1.0, 0.0, 0.0), 1.0, Material(vec3(0.5, 0.5, 0.5), vec3(4.0, 0.2, 2.0), 0.0, 0.0));
-    planes[6] = Plane(vec3(0.0, 3.5, 0.0), vec3(0.0, -1.0, 0.0), 2.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
+    spheres[0] = Sphere(vec3(-0.5, -0.2, 1.0), 0.3, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
+    spheres[1] = Sphere(vec3(1.0, 0.0, -0.5), 0.5, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 1.0, 0.0));
+    planes[0] = Plane(vec3(0.0, -0.5, 0.0), vec3(0.0, 1.0, 0.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
+    planes[1] = Plane(vec3(0.0, 1.5, -2.0), vec3(0.0, 0.0, 1.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
+    planes[2] = Plane(vec3(2.0, 1.5, 0.0), vec3(-1.0, 0.0, 0.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
+    planes[3] = Plane(vec3(1.99, 0.5, 0.0), vec3(-1.0, 0.0, 0.0), 1.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.1, 0.1, 2.0), 0.0, 0.0));
+    planes[4] = Plane(vec3(-2.0, 1.5, 0.0), vec3(1.0, 0.0, 0.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
+    planes[5] = Plane(vec3(-1.99, 0.5, 0.0), vec3(1.0, 0.0, 0.0), 1.0, Material(vec3(0.5, 0.5, 0.5), vec3(2.0, 0.1, 0.1), 0.0, 0.0));
+    planes[6] = Plane(vec3(0.0, 3.5, 0.0), vec3(0.0, -1.0, 0.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
+    planes[7] = Plane(vec3(0.0, 1.5, 4.0), vec3(0.0, 0.0, -1.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
+
     // planes[7] = Plane(vec3(0.0, 3.49, 0.0), vec3(0.0, -1.0, 0.0), 1.0, Material(vec3(0.5, 0.5, 0.5), vec3(2.0, 2.0, 2.0), 0.0, 0.0));
-    //planes[5] = Plane(vec3(0.0, 3.49, 0.0), vec3(0.0, -1.0, 0.0), 1.0, Material(vec3(1.0, 1.0, 1.0), vec3(30.0, 30.0, 30.0)));
+    // planes[5] = Plane(vec3(0.0, 3.49, 0.0), vec3(0.0, -1.0, 0.0), 1.0, Material(vec3(1.0, 1.0, 1.0), vec3(5.0, 5.0, 5.0), 0.0, 0.0));
 
     vec3 color = rayColor(ray);
 
     if(renderTime > 0)
     {
-        fragColor = vec4(averageColor(color), 1.0);
+        out1 = vec4(averageColor(color), 1.0);
         return;
     }
 
-    fragColor = vec4(sqrt(color), 1.0);
+    out1 = vec4(sqrt(color), 1.0);
 }

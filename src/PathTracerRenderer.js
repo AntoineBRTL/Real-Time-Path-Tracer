@@ -7,7 +7,7 @@ export class PathTracerRenderer
     canvas;
 
     /**
-     * @type {WebGLRenderingContext}
+     * @type {WebGL2RenderingContext}
      */
     gl;
 
@@ -124,6 +124,13 @@ export class PathTracerRenderer
                 this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
                 this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
 
+                this.rayTexture = this.gl.createTexture();
+                this.gl.bindTexture(this.gl.TEXTURE_2D, this.rayTexture);
+                this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+                this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+                this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+                this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+
                 this._loadFrameIntoTexture();
 
                 window.addEventListener("resize", function() 
@@ -147,6 +154,21 @@ export class PathTracerRenderer
         this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.canvas.width, this.canvas.height, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, this.canvas);
         this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
         this.gl.activeTexture(this.gl.TEXTURE0);
+    }
+
+    _loadFragOuptutIntoTexture()
+    {
+        let frameBuffer = this.gl.createFramebuffer();
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, frameBuffer);
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.canvas.width, this.canvas.height, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null);
+        this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
+        this.gl.framebufferTexture2D(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT1, this.gl.TEXTURE_2D, this.rayTexture, 0);
+        this.gl.activeTexture(this.gl.TEXTURE0);
+    }
+
+    _loadSceneIntoTexture()
+    {
+        
     }
 
     resetFrameBuffer()
@@ -179,8 +201,10 @@ export class PathTracerRenderer
         parameters.call(this);
         
         this.gl.drawArrays(this.gl.TRIANGLE_FAN, 0, 4);
+
         this._renderTime ++;
         this._loadFrameIntoTexture();
+        // this._loadFragOuptutIntoTexture();
     }
 
     fillMemory(uniformName, value, float = true)
