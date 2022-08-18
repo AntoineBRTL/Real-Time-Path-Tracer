@@ -1,4 +1,4 @@
-# Real-Time-Path-Tracer
+# Real-Time Path-Tracer
 Fast high fidelity ray-tracing rendering program.
 
 This program is written in Javascript and GLSL, and can be run in a browser or any browser-like libraries from Node-JS like [Electron](https://www.electronjs.org/).
@@ -13,12 +13,12 @@ No external libraries are needed to run this program.
 
 What we get: ![alt text](./demo.PNG)
 
-As you can see the image is rendered using small lights source.
+Image with only 2 light sources.
 
 ## Run informations
 
-Tested on a 60 Hz screen with a NVIDIA GeForce GTX 970M without any rendering hierarchy.
+Tested on a 75 Hz screen using a [NVIDIA GeForce GTX 970M](https://www.techpowerup.com/gpu-specs/geforce-gtx-970m.c2623) without any rendering hierarchy.
 
-| Object count | 1 000 | 100 000
-| --- | --- | --- |
-| FPS Average | 60 | 60 |
+| Object count | 10 |
+| --- | --- |
+| FPS Average | 75 |
