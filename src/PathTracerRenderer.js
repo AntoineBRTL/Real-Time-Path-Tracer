@@ -490,6 +490,8 @@ void main()
                 SPHERE_COUNT: data.length
             }
         );
+
+        this.resetFrameBuffer();
     }
 
     recompileShaders(settings)
