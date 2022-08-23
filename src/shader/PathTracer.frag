@@ -44,9 +44,8 @@ struct Camera
     float focalLength;
 };
 
-// output buffers
+// output buffer
 layout(location = 0) out vec4 out1;
-layout(location = 1) out vec4 out2;
 
 in mat4 cameraRotationMatrix;
 uniform float cameraPositionX;
@@ -54,6 +53,7 @@ uniform float cameraPositionY;
 uniform float cameraPositionZ;
 
 vec2 rand;
+float rayPass;
 
 uniform float width;
 uniform float height;
@@ -66,13 +66,16 @@ uniform sampler2D texture1;
 uniform sampler2D texture2;
 uniform int renderTime;
 
-const int SPHERE_COUNT = 3;
+const int SPHERE_COUNT = 2;
 const int PLANE_COUNT = 8;
 const float EPSILON = 1e-6;
 const int MAX_BOUNCE = 5;
+const int SHPERE_DATA_COUNT = 10;
 
 Sphere spheres[SPHERE_COUNT];
 Plane planes[PLANE_COUNT];
+
+//uniform float sphereData[SPHERE_DATA_COUNT];
 
 float random(){
 
@@ -283,7 +286,7 @@ vec3 rayColor(Ray ray)
         Hit hit = rayHit(ray);
 
         // intersection info 
-        out2 = vec4(vec3(float(i) / float(MAX_BOUNCE)), 1.0);
+        rayPass = float(i) + 1.0;
 
         if(!hit.hit)
         {
@@ -311,16 +314,15 @@ vec3 rayColor(Ray ray)
 
 vec3 averageColor(vec3 color)
 {
-    vec3 previousPixel = texture(texture0, vec2(gl_FragCoord.x / width, gl_FragCoord.y / height)).xyz;
+    vec4 data = texture(texture0, vec2(gl_FragCoord.x / width, gl_FragCoord.y / height));
+    vec3 previousPixel = data.xyz;
+
     float averageDensity = 2.0;
 
-    return (sqrt(color) + previousPixel * length(previousPixel) * (float(renderTime) * 1.0/averageDensity)) / (1.0 + length(previousPixel) * (float(renderTime) * 1.0/averageDensity));
-    /*float maxRGB = max(previousPixel.x, max(previousPixel.y, previousPixel.z));
-    float minRGB = min(previousPixel.x, min(previousPixel.y, previousPixel.z));
-    float luminosity = (1.0/2.0 * (maxRGB + minRGB)) / 100.0;
-    float saturation = (maxRGB - minRGB) / (1.0 - abs(2.0 * luminosity - 1.0));
-    float factor = exp(saturation * 0.7) - 1.0;
-    return (sqrt(color) + previousPixel * factor * float(renderTime)) / (1.0 + factor * float(renderTime));*/
+    return 
+    (sqrt(color) + previousPixel * length(previousPixel) * (float(renderTime) * (1.0/averageDensity))) 
+    / 
+    (1.0         +                 length(previousPixel) * (float(renderTime) * (1.0/averageDensity)));
 }
 
 void main()
@@ -341,7 +343,7 @@ void main()
 
     spheres[0] = Sphere(vec3(-0.5, -0.2, 1.0), 0.3, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
     spheres[1] = Sphere(vec3(1.0, 0.0, -0.5), 0.5, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 1.0, 0.0));
-    //spheres[2] = Sphere(vec3(-0.7, 0.3, -1.0), 0.8, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.5, 0.0));
+
     planes[0] = Plane(vec3(0.0, -0.5, 0.0), vec3(0.0, 1.0, 0.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
     planes[1] = Plane(vec3(0.0, 1.5, -2.0), vec3(0.0, 0.0, 1.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
     planes[2] = Plane(vec3(2.0, 1.5, 0.0), vec3(-1.0, 0.0, 0.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
@@ -351,10 +353,6 @@ void main()
     planes[6] = Plane(vec3(0.0, 3.5, 0.0), vec3(0.0, -1.0, 0.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
     planes[7] = Plane(vec3(0.0, 1.5, 4.0), vec3(0.0, 0.0, -1.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
 
-    // planes[7] = Plane(vec3(0.0, 3.49, 0.0), vec3(0.0, -1.0, 0.0), 1.0, Material(vec3(0.5, 0.5, 0.5), vec3(2.0, 2.0, 2.0), 0.0, 0.0));
-    // planes[5] = Plane(vec3(0.0, 3.49, 0.0), vec3(0.0, -1.0, 0.0), 1.0, Material(vec3(1.0, 1.0, 1.0), vec3(5.0, 5.0, 5.0), 0.0, 0.0));
-
-    out2 = vec4(1.0);
     vec3 color = rayColor(ray);
 
     if(renderTime > 0)
