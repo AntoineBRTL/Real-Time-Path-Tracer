@@ -283,7 +283,7 @@ Hit rayHit(Ray ray)
 
         float t = dot(planes[i].center - ray.origin, -normal) / denom;
 
-        if(t <= -EPSILON && t >= EPSILON)
+        if(t <= -EPSILON)
         {
             // intersection behind the camera or too near
             continue;
