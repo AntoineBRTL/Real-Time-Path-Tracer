@@ -1,4 +1,6 @@
 import { PathTracerRenderer } from "../src/PathTracerRenderer.js";
+import { World } from "../src/World.js";
+import { Sphere } from "../src/Sphere.js";
 
 export class Main
 {
@@ -7,6 +9,11 @@ export class Main
         let canvas = this.createCanvas();
         this.stylizeBody().appendChild(canvas);
 
+        let world = new World();
+        let sphere = new Sphere({x: 0, y: 2, z: 0}, 0.5, 0.0, 0.0);
+
+        world.add(sphere);
+
         let renderer = new PathTracerRenderer(canvas, "../src/shader/PathTracer.vert", "../src/shader/PathTracer.frag", function()
         {
             renderer.camera.position.y = 1.0;
@@ -14,7 +21,7 @@ export class Main
 
             function loop() 
             {
-                renderer.render();
+                renderer.render(world);
                 window.requestAnimationFrame(loop);
             }
 
@@ -46,5 +53,4 @@ export class Main
 window.onload = function()
 {
     new Main();
-    (new FPSMeter({ui: true})).start();
 }

@@ -1,3 +1,5 @@
+import {World} from "./World.js";
+
 export class PathTracerRenderer
 {
 
@@ -39,8 +41,6 @@ export class PathTracerRenderer
         this._renderTime = 0;
 
         this.camera = {rotation: {x: 0.0, y: 0.0, z: 0.0}, position: {x: 0.0, y: 0.0, z: 0.0}};
-
-        console.log(this.camera.rotation);
 
         this.initRenderer(vertexShaderPath, fragmentShaderPath, callback);
     }
@@ -116,20 +116,35 @@ export class PathTracerRenderer
 
                 this.gl.useProgram(this.program);
 
-                // generate a texture
-                this.frameTexture = this.gl.createTexture();
-                this.gl.bindTexture(this.gl.TEXTURE_2D, this.frameTexture);
-                this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
-                this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
-                this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
-                this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+                {
+                    this.frameTexture = this.gl.createTexture();
+                    this.gl.bindTexture(this.gl.TEXTURE_2D, this.frameTexture);
+                    this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.canvas.width, this.canvas.height, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null);
+                    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+                    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+                    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+                    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+                }
+                
+                {
+                    this.rayCountTexture = this.gl.createTexture();
+                    this.gl.bindTexture(this.gl.TEXTURE_2D, this.rayCountTexture);
+                    this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.canvas.width, this.canvas.height, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null);
+                    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+                    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+                    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+                    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+                }
 
-                this.rayTexture = this.gl.createTexture();
-                this.gl.bindTexture(this.gl.TEXTURE_2D, this.rayTexture);
-                this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
-                this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
-                this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
-                this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+                {
+                    this.sceneTexture = this.gl.createTexture();
+                    this.gl.bindTexture(this.gl.TEXTURE_2D, this.sceneTexture);
+                    this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, 0, 0, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null);
+                    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+                    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+                    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+                    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+                }
 
                 this._loadFrameIntoTexture();
 
@@ -151,24 +166,69 @@ export class PathTracerRenderer
 
     _loadFrameIntoTexture()
     {
+        this.gl.bindTexture(this.gl.TEXTURE_2D, this.frameTexture);
+
         this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.canvas.width, this.canvas.height, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, this.canvas);
         this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
+
+        let location = this.gl.getUniformLocation(this.program, "texture0");
+        this.gl.uniform1i(location, 0);
+
         this.gl.activeTexture(this.gl.TEXTURE0);
     }
 
     _loadFragOuptutIntoTexture()
     {
-        let frameBuffer = this.gl.createFramebuffer();
-        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, frameBuffer);
-        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.canvas.width, this.canvas.height, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null);
-        this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
-        this.gl.framebufferTexture2D(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT1, this.gl.TEXTURE_2D, this.rayTexture, 0);
-        this.gl.activeTexture(this.gl.TEXTURE0);
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.rayCountBuffer);
+        this.gl.bindTexture(this.gl.TEXTURE_2D, this.rayCountTexture);
+        this.gl.activeTexture(this.gl.TEXTURE1);
     }
 
-    _loadSceneIntoTexture()
+    _loadSceneIntoTexture(world)
     {
+        this.gl.bindTexture(this.gl.TEXTURE_2D, this.sceneTexture);
+
+        let sphereContent = new Array();
+        // sphere
+        world.content.forEach(function(sphere)
+        {
+            for (let i = 0; i < 4; i++)
+            {
+                sphereContent.push(sphere.position.x);
+            }
+
+            for (let i = 0; i < 4; i++)
+            {
+                sphereContent.push(sphere.position.y);
+            }
+
+            for (let i = 0; i < 4; i++)
+            {
+                sphereContent.push(sphere.position.z);
+            }
+
+            for (let i = 0; i < 4; i++)
+            {
+                sphereContent.push(sphere.radius);
+            }
+
+            for (let i = 0; i < 4; i++)
+            {
+                sphereContent.push(sphere.reflectance);
+            }
+
+            for (let i = 0; i < 4; i++)
+            {
+                sphereContent.push(sphere.refractance);
+            }
+        });
+
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, world.content.lenght * 6 * 4, world.content.lenght * 6 * 4, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, new Uint8Array(sphereContent));
         
+        let location = this.gl.getUniformLocation(this.program, "texture2");
+        this.gl.uniform1i(location, 2);
+
+        this.gl.activeTexture(this.gl.TEXTURE2);
     }
 
     resetFrameBuffer()
@@ -176,9 +236,10 @@ export class PathTracerRenderer
         this._renderTime = 0;
     }
 
-    render()
-    {
+    render(world)
+    {   
         this.clear();
+
         this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
 
         function parameters()
@@ -196,15 +257,16 @@ export class PathTracerRenderer
             this.fillMemory("cameraPositionX", this.camera.position.x);
             this.fillMemory("cameraPositionY", this.camera.position.y);
             this.fillMemory("cameraPositionZ", this.camera.position.z);
+            //this._loadSceneIntoTexture(world);
         }
 
         parameters.call(this);
         
         this.gl.drawArrays(this.gl.TRIANGLE_FAN, 0, 4);
 
-        this._renderTime ++;
         this._loadFrameIntoTexture();
-        // this._loadFragOuptutIntoTexture();
+
+        this._renderTime ++;
     }
 
     fillMemory(uniformName, value, float = true)

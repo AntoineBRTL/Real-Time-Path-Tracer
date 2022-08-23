@@ -63,9 +63,10 @@ uniform float random2;
 
 uniform sampler2D texture0;
 uniform sampler2D texture1;
+uniform sampler2D texture2;
 uniform int renderTime;
 
-const int SPHERE_COUNT = 2;
+const int SPHERE_COUNT = 3;
 const int PLANE_COUNT = 8;
 const float EPSILON = 1e-6;
 const int MAX_BOUNCE = 5;
@@ -340,6 +341,7 @@ void main()
 
     spheres[0] = Sphere(vec3(-0.5, -0.2, 1.0), 0.3, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
     spheres[1] = Sphere(vec3(1.0, 0.0, -0.5), 0.5, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 1.0, 0.0));
+    //spheres[2] = Sphere(vec3(-0.7, 0.3, -1.0), 0.8, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.5, 0.0));
     planes[0] = Plane(vec3(0.0, -0.5, 0.0), vec3(0.0, 1.0, 0.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
     planes[1] = Plane(vec3(0.0, 1.5, -2.0), vec3(0.0, 0.0, 1.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
     planes[2] = Plane(vec3(2.0, 1.5, 0.0), vec3(-1.0, 0.0, 0.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
@@ -352,6 +354,7 @@ void main()
     // planes[7] = Plane(vec3(0.0, 3.49, 0.0), vec3(0.0, -1.0, 0.0), 1.0, Material(vec3(0.5, 0.5, 0.5), vec3(2.0, 2.0, 2.0), 0.0, 0.0));
     // planes[5] = Plane(vec3(0.0, 3.49, 0.0), vec3(0.0, -1.0, 0.0), 1.0, Material(vec3(1.0, 1.0, 1.0), vec3(5.0, 5.0, 5.0), 0.0, 0.0));
 
+    out2 = vec4(1.0);
     vec3 color = rayColor(ray);
 
     if(renderTime > 0)
