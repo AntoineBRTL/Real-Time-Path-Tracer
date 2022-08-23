@@ -451,6 +451,7 @@ void main()
         );
     }
 
+    // Kernel Box Like 
     planes[0] = Plane(vec3(0.0, -0.5, 0.0), vec3(0.0, 1.0, 0.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
     planes[1] = Plane(vec3(0.0, 1.5, -2.0), vec3(0.0, 0.0, 1.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
     planes[2] = Plane(vec3(2.0, 1.5, 0.0), vec3(-1.0, 0.0, 0.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
@@ -491,7 +492,7 @@ void main()
             }
         );
 
-        this.resetFrameBuffer();
+        this.resetRenderChain();
     }
 
     recompileShaders(settings)
@@ -561,11 +562,11 @@ void main()
             this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
         }
 
-        this.resetFrameBuffer();
+        this.resetRenderChain();
 
         window.addEventListener("resize", function() 
         {
-            this.resetFrameBuffer();
+            this.resetRenderChain();
         }.bind(this));
     }
 
@@ -588,12 +589,12 @@ void main()
         this.gl.activeTexture(this.gl.TEXTURE0);
     }
 
-    resetFrameBuffer()
+    resetRenderChain()
     {
         this._renderTime = 0;
     }
 
-    render(world)
+    render()
     {   
         this.clear();
 
