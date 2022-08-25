@@ -6,6 +6,7 @@
 
 import { PathTracerRenderer } from "../src/PathTracerRenderer.js";
 import { Sphere } from "../src/Sphere.js";
+import { Plane } from "../src/Plane.js";
 
 export class Main
 {
@@ -14,18 +15,23 @@ export class Main
         let canvas = this.createCanvas();
         this.stylizeBody().appendChild(canvas);
 
-        let sphere = new Sphere({x: -0.5, y: -0.2, z: 1.0}, 0.3, 0.0, 0.0);
-        let sphere2 = new Sphere({x: 1.0, y: 0.0, z: -0.5}, 0.5, 1.0, 0.0);
-
+        let sphere = new Sphere({x: -0.5, y: -0.2, z: 1.0}, 0.3, {r: 0.5, g: 0.5, b: 0.5}, {r: 0.0, g: 0.0, b: 0.0}, 0.0, 0.0);
+        let sphere2 = new Sphere({x: 1.0, y: 0.0, z: -0.5}, 0.5, {r: 0.5, g: 0.5, b: 0.5}, {r: 0.0, g: 0.0, b: 0.0}, 0.0, 0.0);
+        
+        let mirror = new Plane({x: 2.0, y: 0.0, z: 0.0}, {x: -1.0, y: 0.0, z: 0.0}, 0.5, {r: 0.5, g: 0.5, b: 0.5}, {r: 0.0, g: 0.0, b: 0.0}, 1.0, 0.0);
+        let mirror2 = new Plane({x: -2.0, y: 0.0, z: 0.0}, {x: 1.0, y: 0.0, z: 0.0}, 0.5, {r: 0.5, g: 0.5, b: 0.5}, {r: 0.0, g: 0.0, b: 0.0}, 1.0, 0.0);
+        let ground = new Plane({x: 0.0, y: -0.5, z: 0.0}, {x: 0.0, y: 1.0, z: 0.0}, 4.0, {r: 0.5, g: 0.5, b: 0.5}, {r: 0.0, g: 0.0, b: 0.0}, 0.0, 0.0);
+        
         let renderer = new PathTracerRenderer(canvas);
         renderer.camera.position.y = 1.0;
         renderer.camera.position.z = 5.0;
-
-        renderer.addToScene(sphere, sphere2);
+        renderer.setBackgroundColor({r: 0.5, g: 0.7, b: 1.0});
+        renderer.addToScene(ground, mirror, mirror2, sphere, sphere2);
 
         function loop() 
         {
             renderer.render();
+            //renderer.resetRenderChain();
             window.requestAnimationFrame(loop);
 
             // controlls

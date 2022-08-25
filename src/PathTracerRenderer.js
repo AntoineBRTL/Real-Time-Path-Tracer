@@ -1,3 +1,6 @@
+const SPHERE = 0;
+const PLANE = 1;
+
 export class PathTracerRenderer
 {
 
@@ -31,7 +34,11 @@ export class PathTracerRenderer
      */
     camera;
 
+    _backgroundColor;
+
     _scene;
+
+    _shaderConstants;
 
     constructor(canvas, vertexShaderPath, fragmentShaderPath, callback)
     {
@@ -40,11 +47,32 @@ export class PathTracerRenderer
 
         this._renderTime = 0;
 
+        this._shaderConstants = new Object();
+        this._shaderConstants.MAX_BOUNCES = 5;
+        this._shaderConstants.SCENE_DATA_COUNT = 0;
+        this._shaderConstants.SPHERE_COUNT = 0;
+        this._shaderConstants.PLANE_COUNT = 0;
+
+        this._backgroundColor = {r:0.01, g:0.01, b:0.01};
         this.camera = {rotation: {x: 0.0, y: 0.0, z: 0.0}, position: {x: 0.0, y: 0.0, z: 0.0}};
 
         this._scene = new Array();
 
         this.initRenderer(vertexShaderPath, fragmentShaderPath, callback);
+    }
+
+    setBackgroundColor(color)
+    {
+        this._backgroundColor = color;
+
+        this.resetRenderChain();
+    }
+
+    setMaxBounces(x)
+    {
+        this._shaderConstants.MAX_BOUNCES = x;
+        this.recompileShaders();
+        this.resetRenderChain();
     }
 
     getVertexSource()
@@ -80,15 +108,8 @@ void main(){
 `
     }
 
-    getFragmentSource(constants)
+    getFragmentSource()
     {
-        if(!constants)
-        {
-            constants = {
-                SPHERE_DATA_COUNT: 6,
-                SPHERE_COUNT: 1
-            };
-        }
 
         return `#version 300 es
 precision mediump float;
@@ -158,16 +179,20 @@ uniform sampler2D texture1;
 uniform sampler2D texture2;
 uniform int renderTime;
 
-const int SPHERE_COUNT = ` + constants.SPHERE_COUNT + `;
-const int PLANE_COUNT = 8;
+uniform float backgrounColorR;
+uniform float backgrounColorG;
+uniform float backgrounColorB;
+
+const int SPHERE_COUNT = ` + Math.max(1, this._shaderConstants.SPHERE_COUNT) + `;
+const int PLANE_COUNT = ` + Math.max(1, this._shaderConstants.PLANE_COUNT) + `;
 const float EPSILON = 1e-6;
-const int MAX_BOUNCE = 5;
-const int SPHERE_DATA_COUNT = ` + constants.SPHERE_DATA_COUNT + `;
+const int MAX_BOUNCE = ` + this._shaderConstants.MAX_BOUNCES + `;
+const int SCENE_DATA_COUNT = ` + Math.max(1, this._shaderConstants.SCENE_DATA_COUNT) + `;
 
 Sphere spheres[SPHERE_COUNT];
 Plane planes[PLANE_COUNT];
 
-uniform float sphereData[SPHERE_DATA_COUNT];
+uniform float sceneData[SCENE_DATA_COUNT];
 
 float random(){
 
@@ -383,7 +408,7 @@ vec3 rayColor(Ray ray)
         if(!hit.hit)
         {
             // color *= vec3(0.5, 0.7, 1.0);
-            color *= vec3(.01);
+            color *= vec3(backgrounColorR, backgrounColorG, backgrounColorB);
             break;
         }
 
@@ -412,6 +437,11 @@ vec3 averageColor(vec3 color)
     float averageDensity = 2.0;
 
     return 
+    (sqrt(color) + previousPixel * (float(renderTime) * (1.0/averageDensity))) 
+    / 
+    (1.0         +                 (float(renderTime) * (1.0/averageDensity)));
+
+    return 
     (sqrt(color) + previousPixel * length(previousPixel) * (float(renderTime) * (1.0/averageDensity))) 
     / 
     (1.0         +                 length(previousPixel) * (float(renderTime) * (1.0/averageDensity)));
@@ -433,34 +463,82 @@ void main()
     Camera camera = Camera(vec3(cameraPositionX, cameraPositionY, cameraPositionZ), 1.0);
     Ray ray = getRay(camera);
 
-    for(int i = 0; i < SPHERE_COUNT; i++)
+    int sceneIndex = 0;
+
+    int currentSphere = 0;
+    int currentPlane = 0;
+
+    if(SCENE_DATA_COUNT > 0)
     {
-        spheres[i] = Sphere(
-            vec3(
-                sphereData[0 + (i * 6)], 
-                sphereData[1 + (i * 6)], 
-                sphereData[2 + (i * 6)]
-            ),
-            sphereData[3 + (i * 6)],
-            Material(
-                vec3(0.5, 0.5, 0.5), 
-                vec3(0.0, 0.0, 0.0),
-                sphereData[4 + (i * 6)],
-                sphereData[5 + (i * 6)]
-            )
-        );
+        for(int i = 0; i < SCENE_DATA_COUNT; i += 0)
+        {
+            if(sceneData[0 + sceneIndex] == 0.0)
+            {
+                spheres[currentSphere] = Sphere(
+                    vec3(
+                        sceneData[1 + sceneIndex], 
+                        sceneData[2 + sceneIndex], 
+                        sceneData[3 + sceneIndex]
+                    ),
+                    sceneData[4 + sceneIndex],
+                    Material(
+                        vec3(
+                            sceneData[5 + sceneIndex], 
+                            sceneData[6 + sceneIndex], 
+                            sceneData[7 + sceneIndex]
+                            ), 
+                        vec3(
+                            sceneData[8 + sceneIndex], 
+                            sceneData[9 + sceneIndex], 
+                            sceneData[10 + sceneIndex]
+                            ),
+                        sceneData[11 + sceneIndex],
+                        sceneData[12 + sceneIndex]
+                    )
+                );
+    
+                sceneIndex += 13;
+                currentSphere += 1;
+            }
+    
+            if(sceneData[0 + sceneIndex] == 1.0)
+            {
+                planes[currentPlane] = Plane(
+                    vec3(
+                        sceneData[1 + sceneIndex], 
+                        sceneData[2 + sceneIndex], 
+                        sceneData[3 + sceneIndex]
+                    ),
+                    vec3(
+                        sceneData[4 + sceneIndex], 
+                        sceneData[5 + sceneIndex], 
+                        sceneData[6 + sceneIndex]
+                    ),
+                    sceneData[7 + sceneIndex],
+                    Material(
+                        vec3(
+                            sceneData[8 + sceneIndex], 
+                            sceneData[9 + sceneIndex], 
+                            sceneData[10 + sceneIndex]
+                            ), 
+                        vec3(
+                            sceneData[11 + sceneIndex], 
+                            sceneData[12 + sceneIndex], 
+                            sceneData[13 + sceneIndex]
+                            ),
+                        sceneData[14 + sceneIndex],
+                        sceneData[15 + sceneIndex]
+                    )
+                );
+    
+                sceneIndex += 16;
+                currentPlane += 1;
+            }
+
+            i = sceneIndex;
+        }
     }
-
-    // Kernel Box Like 
-    planes[0] = Plane(vec3(0.0, -0.5, 0.0), vec3(0.0, 1.0, 0.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
-    planes[1] = Plane(vec3(0.0, 1.5, -2.0), vec3(0.0, 0.0, 1.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
-    planes[2] = Plane(vec3(2.0, 1.5, 0.0), vec3(-1.0, 0.0, 0.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
-    planes[3] = Plane(vec3(1.99, 0.5, 0.0), vec3(-1.0, 0.0, 0.0), 1.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.1, 0.1, 2.0), 0.0, 0.0));
-    planes[4] = Plane(vec3(-2.0, 1.5, 0.0), vec3(1.0, 0.0, 0.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
-    planes[5] = Plane(vec3(-1.99, 0.5, 0.0), vec3(1.0, 0.0, 0.0), 1.0, Material(vec3(0.5, 0.5, 0.5), vec3(2.0, 0.1, 0.1), 0.0, 0.0));
-    planes[6] = Plane(vec3(0.0, 3.5, 0.0), vec3(0.0, -1.0, 0.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
-    planes[7] = Plane(vec3(0.0, 1.5, 4.0), vec3(0.0, 0.0, -1.0), 4.0, Material(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 0.0), 0.0, 0.0));
-
+    
     vec3 color = rayColor(ray);
 
     if(renderTime > 0)
@@ -476,32 +554,77 @@ void main()
 
     addToScene(...data)
     {
+
+        let sphereCount = 0;
+        let planeCount = 0;
+
         data.forEach(function(d){
-            this._scene.push(d.position.x);
-            this._scene.push(d.position.y);
-            this._scene.push(d.position.z);
-            this._scene.push(d.radius);
-            this._scene.push(d.reflectance);
-            this._scene.push(d.refractance);
+
+            if(d.constructor.name == "Sphere")
+            {
+                this._scene.push(SPHERE);
+                this._scene.push(d.position.x);
+                this._scene.push(d.position.y);
+                this._scene.push(d.position.z);
+                this._scene.push(d.radius);
+                this._scene.push(d.color.r);
+                this._scene.push(d.color.g);
+                this._scene.push(d.color.b);
+                this._scene.push(d.emissive.r);
+                this._scene.push(d.emissive.g);
+                this._scene.push(d.emissive.b);
+                this._scene.push(d.reflectance);
+                this._scene.push(d.refractance);
+
+                sphereCount ++;
+            }
+
+            if(d.constructor.name == "Plane")
+            {
+                this._scene.push(PLANE);
+                this._scene.push(d.position.x);
+                this._scene.push(d.position.y);
+                this._scene.push(d.position.z);
+                this._scene.push(d.orientation.x);
+                this._scene.push(d.orientation.y);
+                this._scene.push(d.orientation.z);
+                this._scene.push(d.size);
+                this._scene.push(d.color.r);
+                this._scene.push(d.color.g);
+                this._scene.push(d.color.b);
+                this._scene.push(d.emissive.r);
+                this._scene.push(d.emissive.g);
+                this._scene.push(d.emissive.b);
+                this._scene.push(d.reflectance);
+                this._scene.push(d.refractance);
+
+                planeCount ++;
+            }
         }, this);
 
-        this.recompileShaders(
-            {
-                SPHERE_DATA_COUNT: data.length * 6,
-                SPHERE_COUNT: data.length
-            }
-        );
+        //sphereCount = sphereCount == 0 ? 1 : sphereCount;
+        //planeCount = planeCount == 0 ? 1 : planeCount;
 
+        console.log(this._scene, planeCount, sphereCount);
+
+        this._shaderConstants.SCENE_DATA_COUNT = sphereCount * 13 + planeCount * 16;
+        this._shaderConstants.SPHERE_COUNT = sphereCount;
+        this._shaderConstants.PLANE_COUNT = planeCount;
+
+        this.recompileShaders();
         this.resetRenderChain();
     }
 
-    recompileShaders(settings)
+    recompileShaders()
     {
+
+        console.log(this.getFragmentSource());
+
         let vertexShader = this.gl.createShader(this.gl.VERTEX_SHADER);
         let fragmentShader = this.gl.createShader(this.gl.FRAGMENT_SHADER);
 
         this.gl.shaderSource(vertexShader, this.getVertexSource());
-        this.gl.shaderSource(fragmentShader, this.getFragmentSource(settings));
+        this.gl.shaderSource(fragmentShader, this.getFragmentSource());
 
         this.gl.compileShader(vertexShader);
         this.gl.compileShader(fragmentShader);
@@ -556,6 +679,7 @@ void main()
             this.frameTexture = this.gl.createTexture();
             this.gl.bindTexture(this.gl.TEXTURE_2D, this.frameTexture);
             this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.canvas.width, this.canvas.height, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null);
+            this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
             this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
             this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
             this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
@@ -616,6 +740,10 @@ void main()
             this.fillMemory("cameraPositionY", this.camera.position.y);
             this.fillMemory("cameraPositionZ", this.camera.position.z);
 
+            this.fillMemory("backgrounColorR", this._backgroundColor.r);
+            this.fillMemory("backgrounColorG", this._backgroundColor.g);
+            this.fillMemory("backgrounColorB", this._backgroundColor.b);
+
             this.SceneMemory();
         }
 
@@ -645,7 +773,7 @@ void main()
     {
         for(let i = 0; i < this._scene.length; i++)
         {
-            let location = this.gl.getUniformLocation(this.program, "sphereData[" + i + "]");
+            let location = this.gl.getUniformLocation(this.program, "sceneData[" + i + "]");
             this.gl.uniform1f(location, new Float32Array([this._scene[i]])[0]);
         }
     }

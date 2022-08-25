@@ -1,8 +1,10 @@
-export class Sphere
+export class Plane
 {
     position;
 
-    radius;
+    orientation;
+
+    size;
 
     color;
 
@@ -12,10 +14,11 @@ export class Sphere
 
     refractance;
 
-    constructor(position, radius, color, emissive, reflectance, refractance)
+    constructor(position, orientation, size, color, emissive, reflectance, refractance)
     {
         this.position = position;
-        this.radius = radius;
+        this.orientation = orientation;
+        this.size = size;
         this.color = color;
         this.emissive = emissive;
         this.reflectance = reflectance;
