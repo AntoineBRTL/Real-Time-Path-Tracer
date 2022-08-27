@@ -829,7 +829,7 @@ void main()
         }
 
         // make sure it's a floating number
-        gl.uniform1f(location, new Float32Array([value]));
+        gl.uniform1f(location, value);
     }
 
     static initOpenGL(canvas)

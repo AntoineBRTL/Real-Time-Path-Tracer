@@ -13,8 +13,6 @@ No external libraries are needed to run this program.
 
 What we get: ![alt text](./demo.PNG)
 
-Image with only 2 light sources.
-
 ## Run informations
 
 Tested on a 75 Hz screen using a [NVIDIA GeForce GTX 970M](https://www.techpowerup.com/gpu-specs/geforce-gtx-970m.c2623) without any rendering hierarchy.
@@ -22,6 +20,8 @@ Tested on a 75 Hz screen using a [NVIDIA GeForce GTX 970M](https://www.techpower
 | Object count | 10 | 120 |
 | --- | --- | --- |
 | FPS Average | 75 | 75 |
+
+On the demo scene, I got one frame rendered at an average of 0.3 ms.
 
 ## How to use
 
