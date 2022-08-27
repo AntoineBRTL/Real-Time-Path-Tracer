@@ -201,7 +201,7 @@ uniform float backgrounColorB;
 
 const int SPHERE_COUNT = ` + Math.max(1, this._shaderConstants.SPHERE_COUNT) + `;
 const int PLANE_COUNT = ` + Math.max(1, this._shaderConstants.PLANE_COUNT) + `;
-const float EPSILON = 1e-6;
+const float EPSILON = 1e-5;
 const int MAX_BOUNCE = ` + this._shaderConstants.MAX_BOUNCES + `;
 
 Sphere spheres[SPHERE_COUNT];
@@ -422,9 +422,6 @@ vec3 rayColor(Ray ray)
     {
         Hit hit = rayHit(ray);
 
-        // intersection info 
-        rayPass = float(i) + 1.0;
-
         if(!hit.hit)
         {
             // color *= vec3(0.5, 0.7, 1.0);
@@ -439,6 +436,11 @@ vec3 rayColor(Ray ray)
             break;
         }
 
+        if(i == MAX_BOUNCE - 1)
+        {
+            color = vec3(0.0, 0.0, 0.0);
+        }
+
         color *= hit.material.color;
 
         // change ray direction & origin
@@ -451,20 +453,25 @@ vec3 rayColor(Ray ray)
 
 vec3 averageColor(vec3 color)
 {
-    vec4 data = texture(texture0, vec2(gl_FragCoord.x / width, gl_FragCoord.y / height));
+    /*vec4 data = texture(texture0, vec2(gl_FragCoord.x / width, gl_FragCoord.y / height));
     vec3 previousPixel = data.xyz;
 
-    float averageDensity = 2.0;
+    float averageDensity = 2.0;*/
+
+    float averagingIndex = 1.0;
+
+    vec3 averagedPixel = texture(texture0, vec2(gl_FragCoord.x / width, gl_FragCoord.y / height)).xyz;
+    return (sqrt(color) + averagedPixel * (float(renderTime) - 1.0) / averagingIndex) / (1.0 + (float(renderTime) - 1.0) / averagingIndex);
 
     /*return 
     (sqrt(color) + previousPixel * (float(renderTime) * (1.0/averageDensity))) 
     / 
-    (1.0         +                 (float(renderTime) * (1.0/averageDensity)));*/
+    (1.0         +                 (float(renderTime) * (1.0/averageDensity)));
 
     return 
     (sqrt(color) + previousPixel * length(previousPixel) * (float(renderTime) * (1.0/averageDensity))) 
     / 
-    (1.0         +                 length(previousPixel) * (float(renderTime) * (1.0/averageDensity)));
+    (1.0         +                 length(previousPixel) * (float(renderTime) * (1.0/averageDensity)));*/
 }
 
 void main()
