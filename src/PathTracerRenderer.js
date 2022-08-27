@@ -4,7 +4,12 @@ export class PathTracerRenderer
     /**
      * @type {HTMLCanvasElement}
      */
-    canvas;
+    postprocessingCanvas;
+
+    /**
+     * @type {HTMLCanvasElement}
+     */
+    renderingCanvas;
 
     /**
      * @type {WebGL2RenderingContext}
@@ -12,14 +17,29 @@ export class PathTracerRenderer
     gl;
 
     /**
-     * 
+     * @type {WebGLProgram}
      */
     program;
 
     /**
-     * 
+     * @type {WebGLTexture}
      */
     frameTexture;
+
+    /**
+     * @type {WebGL2RenderingContext}
+     */
+    postprocessingGl;
+
+    /**
+     * @type {WebGLProgram}
+     */
+    postprocessinProgram;
+
+    /**
+     * @type {WebGLTexture}
+     */
+    postprocessingFrameTexture;
 
     /**
      * @type {number}
@@ -49,12 +69,20 @@ export class PathTracerRenderer
     constructor(canvas, vertexShaderPath, fragmentShaderPath, callback)
     {
         {
-            this.canvas = canvas;
-            this.gl = PathTracerRenderer.initOpenGL(this.canvas);
-        }
-        
-        {
-            this._renderTime = 0;
+            this.postprocessingCanvas = canvas;
+
+            // clone the canvas 
+            this.renderingCanvas = document.createElement('canvas');
+            this.renderingCanvas.width = this.postprocessingCanvas.width;
+            this.renderingCanvas.height = this.postprocessingCanvas.height;
+            window.addEventListener("resize", function(){
+                this.fcanvas.width = this.postprocessingCanvas.width;
+                this.fcanvas.height = this.postprocessingCanvas.height;
+                console.log("test");
+            }.bind(this));
+
+            this.gl = PathTracerRenderer.initOpenGL(this.renderingCanvas);
+            this.postprocessingGl = PathTracerRenderer.initOpenGL(this.postprocessingCanvas);
         }
 
         {
@@ -66,6 +94,7 @@ export class PathTracerRenderer
         }
         
         {
+            this._renderTime = 0;
             this._backgroundColor = {r:0.01, g:0.01, b:0.01};
             this.volumeDensity = 0.0;
             this._scene = "// wrote by the program \n";
@@ -509,6 +538,40 @@ void main()
         `
     }
 
+    getPostProcessingVertexSource()
+    {
+        return `#version 300 es
+precision mediump float;
+
+in vec3 vertexPosition;
+
+void main()
+{
+    gl_Position = vec4(vertexPosition, 1.0);
+}
+`;
+    }
+
+    getPostProcessingFragmentSource()
+    {
+        return `#version 300 es
+precision mediump float;
+
+uniform float width;
+uniform float height;
+uniform sampler2D texture0;
+
+layout(location = 0) out vec4 out1;
+
+void main()
+{
+    vec2 uv = gl_FragCoord.xy / vec2(width, height);
+
+    out1 = texture(texture0, uv);
+}
+`;
+    }
+
     addToScene(...data)
     {
 
@@ -559,34 +622,47 @@ void main()
 
     recompileShaders()
     {
+        this.compileShader(this.gl, this.getVertexSource(), this.getFragmentSource(), false);
+    }
 
-        let vertexShader = this.gl.createShader(this.gl.VERTEX_SHADER);
-        let fragmentShader = this.gl.createShader(this.gl.FRAGMENT_SHADER);
+    compileShader(gl, v, f, denoiser)
+    {
+        let vertexShader = gl.createShader(gl.VERTEX_SHADER);
+        let fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
 
-        this.gl.shaderSource(vertexShader, this.getVertexSource());
-        this.gl.shaderSource(fragmentShader, this.getFragmentSource());
+        gl.shaderSource(vertexShader, v);
+        gl.shaderSource(fragmentShader, f);
 
-        this.gl.compileShader(vertexShader);
-        this.gl.compileShader(fragmentShader);
+        gl.compileShader(vertexShader);
+        gl.compileShader(fragmentShader);
 
         // logs
-        if(!this.gl.getShaderParameter(vertexShader, this.gl.COMPILE_STATUS))
+        if(!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS))
         {
-            throw new Error(this.gl.getShaderInfoLog(vertexShader));
+            throw new Error(gl.getShaderInfoLog(vertexShader));
         }
 
-        if(!this.gl.getShaderParameter(fragmentShader, this.gl.COMPILE_STATUS))
+        if(!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS))
         {
-            throw new Error(this.gl.getShaderInfoLog(fragmentShader));
+            throw new Error(gl.getShaderInfoLog(fragmentShader));
         }
 
         // program
-        this.program = this.gl.createProgram();
-        this.gl.attachShader(this.program, vertexShader);
-        this.gl.attachShader(this.program, fragmentShader);
+        let program = gl.createProgram();
+        gl.attachShader(program, vertexShader);
+        gl.attachShader(program, fragmentShader);
 
-        this.gl.linkProgram(this.program);
-        this.gl.useProgram(this.program);
+        gl.linkProgram(program);
+        gl.useProgram(program);
+
+        if(denoiser)
+        {
+            this.postprocessinProgram = program;
+        }
+        else
+        {
+            this.program = program;
+        }
 
         return {vertexShader: vertexShader, fragmentShader: fragmentShader}
     }
@@ -594,7 +670,7 @@ void main()
     initRenderer()
     {
         // create vertex & fragment shader, & compile them
-        this.recompileShaders();
+        this.compileShader(this.gl, this.getVertexSource(), this.getFragmentSource(), false);
 
         // create a quad
         let vertices = new Array();
@@ -606,24 +682,52 @@ void main()
         // convert in into a float array for Open-GL
         vertices = new Float32Array(vertices);
 
-        // link the vertices to the vertex shader
-        let buffer = this.gl.createBuffer();
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
-        this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.STATIC_DRAW);
+        {
+            // link the vertices to the vertex shader
+            let buffer = this.gl.createBuffer();
+            this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
+            this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.STATIC_DRAW);
 
-        let location = this.gl.getAttribLocation(this.program, 'vertexPosition');
-        this.gl.vertexAttribPointer(location, 3, this.gl.FLOAT, false, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
-        this.gl.enableVertexAttribArray(location);
-
+            let location = this.gl.getAttribLocation(this.program, 'vertexPosition');
+            this.gl.vertexAttribPointer(location, 3, this.gl.FLOAT, false, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
+            this.gl.enableVertexAttribArray(location);
+        }
+        
         {
             this.frameTexture = this.gl.createTexture();
             this.gl.bindTexture(this.gl.TEXTURE_2D, this.frameTexture);
-            this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.canvas.width, this.canvas.height, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null);
+            this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.postprocessingCanvas.width, this.postprocessingCanvas.height, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null);
             this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
             this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
             this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
             this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
             this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+        }
+
+        // POST PROCESSING
+
+        this.compileShader(this.postprocessingGl, this.getPostProcessingVertexSource(), this.getPostProcessingFragmentSource(), true);
+
+        {
+            // link the vertices to the vertex shader
+            let buffer = this.postprocessingGl.createBuffer();
+            this.postprocessingGl.bindBuffer(this.postprocessingGl.ARRAY_BUFFER, buffer);
+            this.postprocessingGl.bufferData(this.postprocessingGl.ARRAY_BUFFER, vertices, this.postprocessingGl.STATIC_DRAW);
+
+            let location = this.postprocessingGl.getAttribLocation(this.postprocessinProgram, 'vertexPosition');
+            this.postprocessingGl.vertexAttribPointer(location, 3, this.postprocessingGl.FLOAT, false, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
+            this.postprocessingGl.enableVertexAttribArray(location);
+        }
+
+        {
+            this.postprocessingFrameTexture = this.postprocessingGl.createTexture();
+            this.postprocessingGl.bindTexture(this.postprocessingGl.TEXTURE_2D, this.postprocessingFrameTexture);
+            this.postprocessingGl.texImage2D(this.postprocessingGl.TEXTURE_2D, 0, this.postprocessingGl.RGBA, this.postprocessingCanvas.width, this.postprocessingCanvas.height, 0, this.postprocessingGl.RGBA, this.postprocessingGl.UNSIGNED_BYTE, null);
+            this.postprocessingGl.pixelStorei(this.postprocessingGl.UNPACK_FLIP_Y_WEBGL, true);
+            this.postprocessingGl.texParameteri(this.postprocessingGl.TEXTURE_2D, this.postprocessingGl.TEXTURE_WRAP_S, this.postprocessingGl.CLAMP_TO_EDGE);
+            this.postprocessingGl.texParameteri(this.postprocessingGl.TEXTURE_2D, this.postprocessingGl.TEXTURE_WRAP_S, this.postprocessingGl.CLAMP_TO_EDGE);
+            this.postprocessingGl.texParameteri(this.postprocessingGl.TEXTURE_2D, this.postprocessingGl.TEXTURE_MIN_FILTER, this.postprocessingGl.LINEAR);
+            this.postprocessingGl.texParameteri(this.postprocessingGl.TEXTURE_2D, this.postprocessingGl.TEXTURE_MAG_FILTER, this.postprocessingGl.LINEAR);
         }
 
         this.resetRenderChain();
@@ -638,19 +742,37 @@ void main()
     {
         this.gl.clearColor(0.0, 0.0, 0.0, 1.0);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+
+        this.postprocessingGl.clearColor(0.0, 0.0, 0.0, 1.0);
+        this.postprocessingGl.clear(this.gl.COLOR_BUFFER_BIT);
+
+        this.gl.viewport(0, 0, this.postprocessingCanvas.width, this.postprocessingCanvas.height);
+        this.postprocessingGl.viewport(0, 0, this.postprocessingCanvas.width, this.postprocessingCanvas.height);
     }
 
     _loadFrameIntoTexture()
     {
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.frameTexture);
 
-        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.canvas.width, this.canvas.height, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, this.canvas);
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.renderingCanvas.width, this.renderingCanvas.height, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, this.renderingCanvas);
         this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
 
         let location = this.gl.getUniformLocation(this.program, "texture0");
         this.gl.uniform1i(location, 0);
 
         this.gl.activeTexture(this.gl.TEXTURE0);
+
+        // post processing
+
+        this.postprocessingGl.bindTexture(this.postprocessingGl.TEXTURE_2D, this.postprocessingFrameTexture);
+
+        this.postprocessingGl.texImage2D(this.postprocessingGl.TEXTURE_2D, 0, this.postprocessingGl.RGBA, this.renderingCanvas.width, this.renderingCanvas.height, 0, this.postprocessingGl.RGBA, this.postprocessingGl.UNSIGNED_BYTE, this.renderingCanvas);
+        this.postprocessingGl.pixelStorei(this.postprocessingGl.UNPACK_FLIP_Y_WEBGL, true);
+
+        let locationd = this.postprocessingGl.getUniformLocation(this.postprocessinProgram, "texture0");
+        this.postprocessingGl.uniform1i(locationd, 0);
+
+        this.postprocessingGl.activeTexture(this.postprocessingGl.TEXTURE0);
     }
 
     resetRenderChain()
@@ -662,50 +784,52 @@ void main()
     {   
         this.clear();
 
-        this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-
-        function parameters()
         {
-            this.fillMemory("width", this.canvas.width);
-            this.fillMemory("height", this.canvas.height);
-            this.fillMemory("random1", Math.random() * (1 + 1) - 1);
-            this.fillMemory("random2", Math.random() * (1 + 1) - 1);
-            this.fillMemory("random3", Math.random() * (1 + 1) - 1);
-            this.fillMemory("renderTime", this._renderTime, false);
+            this.fillMemory(this.gl, this.program, "width", this.postprocessingCanvas.width);
+            this.fillMemory(this.gl, this.program, "height", this.postprocessingCanvas.height);
+            this.fillMemory(this.postprocessingGl, this.postprocessinProgram, "width", this.postprocessingCanvas.width);
+            this.fillMemory(this.postprocessingGl, this.postprocessinProgram, "height", this.postprocessingCanvas.height);
+            this.fillMemory(this.gl, this.program, "random1", Math.random() * (1 + 1) - 1);
+            this.fillMemory(this.gl, this.program, "random2", Math.random() * (1 + 1) - 1);
+            this.fillMemory(this.gl, this.program, "random3", Math.random() * (1 + 1) - 1);
+            this.fillMemory(this.gl, this.program, "renderTime", this._renderTime, false);
 
-            this.fillMemory("cameraRotationX", this.camera.rotation.x);
-            this.fillMemory("cameraRotationY", this.camera.rotation.y);
-            this.fillMemory("cameraRotationZ", this.camera.rotation.z);
+            this.fillMemory(this.gl, this.program, "cameraRotationX", this.camera.rotation.x);
+            this.fillMemory(this.gl, this.program, "cameraRotationY", this.camera.rotation.y);
+            this.fillMemory(this.gl, this.program, "cameraRotationZ", this.camera.rotation.z);
 
-            this.fillMemory("cameraPositionX", this.camera.position.x);
-            this.fillMemory("cameraPositionY", this.camera.position.y);
-            this.fillMemory("cameraPositionZ", this.camera.position.z);
+            this.fillMemory(this.gl, this.program, "cameraPositionX", this.camera.position.x);
+            this.fillMemory(this.gl, this.program, "cameraPositionY", this.camera.position.y);
+            this.fillMemory(this.gl, this.program, "cameraPositionZ", this.camera.position.z);
 
-            this.fillMemory("backgrounColorR", this._backgroundColor.r);
-            this.fillMemory("backgrounColorG", this._backgroundColor.g);
-            this.fillMemory("backgrounColorB", this._backgroundColor.b);
+            this.fillMemory(this.gl, this.program, "backgrounColorR", this._backgroundColor.r);
+            this.fillMemory(this.gl, this.program, "backgrounColorG", this._backgroundColor.g);
+            this.fillMemory(this.gl, this.program, "backgrounColorB", this._backgroundColor.b);
         }
-
-        parameters.call(this);
         
-        this.gl.drawArrays(this.gl.TRIANGLE_FAN, 0, 4);
-
-        this._loadFrameIntoTexture();
-        this._renderTime ++;
+        {
+            this.gl.drawArrays(this.gl.TRIANGLE_FAN, 0, 4);
+            this.postprocessingGl.drawArrays(this.gl.TRIANGLE_FAN, 0, 4);
+        }
+        
+        {
+            this._loadFrameIntoTexture();
+            this._renderTime ++;
+        }
     }
 
-    fillMemory(uniformName, value, float = true)
+    fillMemory(gl, program, uniformName, value, float = true)
     {
-        let location = this.gl.getUniformLocation(this.program, uniformName);
+        let location = gl.getUniformLocation(program, uniformName);
 
         if(!float)
         {
-            this.gl.uniform1i(location, value);
+            gl.uniform1i(location, value);
             return;
         }
 
         // make sure it's a floating number
-        this.gl.uniform1f(location, new Float32Array([value])[0]);
+        gl.uniform1f(location, new Float32Array([value]));
     }
 
     static initOpenGL(canvas)
