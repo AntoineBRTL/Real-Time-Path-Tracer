@@ -1,6 +1,3 @@
-const SPHERE = 0;
-const PLANE = 1;
-
 export class PathTracerRenderer
 {
 

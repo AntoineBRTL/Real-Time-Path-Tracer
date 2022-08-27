@@ -19,6 +19,16 @@ Image with only 2 light sources.
 
 Tested on a 75 Hz screen using a [NVIDIA GeForce GTX 970M](https://www.techpowerup.com/gpu-specs/geforce-gtx-970m.c2623) without any rendering hierarchy.
 
-| Object count | 10 |
-| --- | --- |
-| FPS Average | 75 |
+| Object count | 10 | 120 |
+| --- | --- | --- |
+| FPS Average | 75 | 75 |
+
+## How to use
+
+Methods you may have to use :
+
+- `PathTracerRenderer.render()` renders one frame - note that multiple frames are needed to get a clear image.
+- `PathTracerRenderer.resetRenderChain()` breaks the rendering chain which also break the averaging chain.
+- `PathTracerRenderer.addToScene(objects:object[])` adds objects to render - note that it's better to add a list of objects than calling this method multiple times with only one object per call - note that this method automatically recompiles the shaders.
+- `PathTracerRenderer.setBackgroundColor(color:object)` changes the sky/background color of the renderer - note that this method automatically recompiles the shaders.
+- `PathTracerRenderer.setMaxBounces(x:number)` changes the maximum bounce(s) per rays - note that this method automatically recompiles the shaders.
