@@ -34,29 +34,49 @@ export class PathTracerRenderer
      */
     camera;
 
+    /**
+     * @type {Object}
+     */
     _backgroundColor;
 
+    /**
+     * @type {String}
+     */
     _scene;
 
+    /**
+     * @type {Object}
+     */
     _shaderConstants;
 
     constructor(canvas, vertexShaderPath, fragmentShaderPath, callback)
     {
-        this.canvas = canvas;
-        this.gl = PathTracerRenderer.initOpenGL(this.canvas);
+        {
+            this.canvas = canvas;
+            this.gl = PathTracerRenderer.initOpenGL(this.canvas);
+        }
+        
+        {
+            this._renderTime = 0;
+        }
 
-        this._renderTime = 0;
+        {
+            this._shaderConstants = new Object();
+            this._shaderConstants.MAX_BOUNCES = 5;
+            this._shaderConstants.SCENE_DATA_COUNT = 0;
+            this._shaderConstants.SPHERE_COUNT = 0;
+            this._shaderConstants.PLANE_COUNT = 0;
+        }
+        
+        {
+            this._backgroundColor = {r:0.01, g:0.01, b:0.01};
+            this.volumeDensity = 0.0;
+            this._scene = "// wrote by the program \n";
+        }
 
-        this._shaderConstants = new Object();
-        this._shaderConstants.MAX_BOUNCES = 5;
-        this._shaderConstants.SCENE_DATA_COUNT = 0;
-        this._shaderConstants.SPHERE_COUNT = 0;
-        this._shaderConstants.PLANE_COUNT = 0;
-
-        this._backgroundColor = {r:0.01, g:0.01, b:0.01};
-        this.camera = {rotation: {x: 0.0, y: 0.0, z: 0.0}, position: {x: 0.0, y: 0.0, z: 0.0}};
-
-        this._scene = new Array();
+        {
+            this.camera = {rotation: {x: 0.0, y: 0.0, z: 0.0}, position: {x: 0.0, y: 0.0, z: 0.0}};
+        }
 
         this.initRenderer(vertexShaderPath, fragmentShaderPath, callback);
     }
@@ -64,7 +84,6 @@ export class PathTracerRenderer
     setBackgroundColor(color)
     {
         this._backgroundColor = color;
-
         this.resetRenderChain();
     }
 
@@ -110,7 +129,6 @@ void main(){
 
     getFragmentSource()
     {
-
         return `#version 300 es
 precision mediump float;
 
@@ -173,6 +191,7 @@ uniform float height;
 
 uniform float random1;
 uniform float random2;
+uniform float random3;
 
 uniform sampler2D texture0;
 uniform sampler2D texture1;
@@ -187,12 +206,9 @@ const int SPHERE_COUNT = ` + Math.max(1, this._shaderConstants.SPHERE_COUNT) + `
 const int PLANE_COUNT = ` + Math.max(1, this._shaderConstants.PLANE_COUNT) + `;
 const float EPSILON = 1e-6;
 const int MAX_BOUNCE = ` + this._shaderConstants.MAX_BOUNCES + `;
-const int SCENE_DATA_COUNT = ` + Math.max(1, this._shaderConstants.SCENE_DATA_COUNT) + `;
 
 Sphere spheres[SPHERE_COUNT];
 Plane planes[PLANE_COUNT];
-
-uniform float sceneData[SCENE_DATA_COUNT];
 
 float random(){
 
@@ -201,7 +217,7 @@ float random(){
     random1 = (random1 * 2.0) - 1.0; // range [-1, 1]
 
     rand.x = dot(vec2(random2), rand * random1);
-    rand.y = dot(vec2(random2), rand / random1);
+    rand.y = dot(vec2(random3), rand / random1);
 
     rand = normalize(rand);
 
@@ -341,26 +357,31 @@ Hit rayHit(Ray ray)
                         hitT = t;
                         hitMaterial = planes[i].material;
                         hitPoint = point;
-                        hitNormal = planes[i].normal;
+                        hitNormal = normalize(planes[i].normal);
                     }  
                 }
             }
         }
     }
 
-    // Volumes -> uniform
-    float density = 0.0;
-    float t = (-1.0/density * log(random())) / length(ray.direction);
-    if(t < hitT)
+    /*// Volumes -> uniform
+    float density = abs(volumeDensity);
+    float t = (-1.0/density * (random()));
+
+    // TODO: check range
+    if(t > 0.0)
     {
-        // nearest intersection
-        hit = true;
-        hitT = t;
-        hitMaterial = Material(vec3(1.0, 1.0, 1.0), vec3(0.0, 0.0, 0.0), 0.0, 0.0);
-        vec3 point = rayAt(ray, t);
-        hitPoint = point;
-        hitNormal = randomVec3();
-    }
+        if(t < hitT)
+        {
+            // nearest intersection
+            hit = true;
+            hitT = t;
+            hitMaterial = Material(vec3(0.0, 0.0, 0.0), vec3(0.0, 0.0, 0.0), 0.0, 0.0);
+            vec3 point = rayAt(ray, t);
+            hitPoint = point;
+            hitNormal = vec3(0.0);
+        }
+    }*/
 
     return Hit(hit, hitPoint, hitNormal, hitMaterial);
 }
@@ -380,7 +401,7 @@ vec3 getScatteredDirection(vec3 i, vec3 n, float reflection, float refraction, f
 
     if(refraction > 0.0)
     {
-        if(reflectance(cosTheta, ir) >= (random1 + 1.0) / 2.0)
+        if(reflectance(cosTheta, ir) >= (random() + 1.0) / 2.0)
         {
             refracted = reflection > 0.0 ? reflected : reflect(i, n);
         }
@@ -390,7 +411,9 @@ vec3 getScatteredDirection(vec3 i, vec3 n, float reflection, float refraction, f
         }
     }
 
-    return normalize(diffuse * (1.0 - min(reflection + refraction, 1.0)) + reflected * reflection + refracted * refraction);
+    return normalize(
+        diffuse * (1.0 - min(reflection + refraction, 1.0)) + (reflected * reflection) + (refracted * refraction)
+    );
 }
 
 vec3 rayColor(Ray ray)
@@ -436,10 +459,10 @@ vec3 averageColor(vec3 color)
 
     float averageDensity = 2.0;
 
-    return 
+    /*return 
     (sqrt(color) + previousPixel * (float(renderTime) * (1.0/averageDensity))) 
     / 
-    (1.0         +                 (float(renderTime) * (1.0/averageDensity)));
+    (1.0         +                 (float(renderTime) * (1.0/averageDensity)));*/
 
     return 
     (sqrt(color) + previousPixel * length(previousPixel) * (float(renderTime) * (1.0/averageDensity))) 
@@ -463,81 +486,11 @@ void main()
     Camera camera = Camera(vec3(cameraPositionX, cameraPositionY, cameraPositionZ), 1.0);
     Ray ray = getRay(camera);
 
-    int sceneIndex = 0;
-
-    int currentSphere = 0;
-    int currentPlane = 0;
-
-    if(SCENE_DATA_COUNT > 0)
-    {
-        for(int i = 0; i < SCENE_DATA_COUNT; i += 0)
-        {
-            if(sceneData[0 + sceneIndex] == 0.0)
-            {
-                spheres[currentSphere] = Sphere(
-                    vec3(
-                        sceneData[1 + sceneIndex], 
-                        sceneData[2 + sceneIndex], 
-                        sceneData[3 + sceneIndex]
-                    ),
-                    sceneData[4 + sceneIndex],
-                    Material(
-                        vec3(
-                            sceneData[5 + sceneIndex], 
-                            sceneData[6 + sceneIndex], 
-                            sceneData[7 + sceneIndex]
-                            ), 
-                        vec3(
-                            sceneData[8 + sceneIndex], 
-                            sceneData[9 + sceneIndex], 
-                            sceneData[10 + sceneIndex]
-                            ),
-                        sceneData[11 + sceneIndex],
-                        sceneData[12 + sceneIndex]
-                    )
-                );
+    `
     
-                sceneIndex += 13;
-                currentSphere += 1;
-            }
+    + this._scene +
     
-            if(sceneData[0 + sceneIndex] == 1.0)
-            {
-                planes[currentPlane] = Plane(
-                    vec3(
-                        sceneData[1 + sceneIndex], 
-                        sceneData[2 + sceneIndex], 
-                        sceneData[3 + sceneIndex]
-                    ),
-                    vec3(
-                        sceneData[4 + sceneIndex], 
-                        sceneData[5 + sceneIndex], 
-                        sceneData[6 + sceneIndex]
-                    ),
-                    sceneData[7 + sceneIndex],
-                    Material(
-                        vec3(
-                            sceneData[8 + sceneIndex], 
-                            sceneData[9 + sceneIndex], 
-                            sceneData[10 + sceneIndex]
-                            ), 
-                        vec3(
-                            sceneData[11 + sceneIndex], 
-                            sceneData[12 + sceneIndex], 
-                            sceneData[13 + sceneIndex]
-                            ),
-                        sceneData[14 + sceneIndex],
-                        sceneData[15 + sceneIndex]
-                    )
-                );
-    
-                sceneIndex += 16;
-                currentPlane += 1;
-            }
-
-            i = sceneIndex;
-        }
-    }
+    `
     
     vec3 color = rayColor(ray);
 
@@ -558,54 +511,39 @@ void main()
         let sphereCount = 0;
         let planeCount = 0;
 
+        let floatPrecision = 5;
+
         data.forEach(function(d){
 
             if(d.constructor.name == "Sphere")
             {
-                this._scene.push(SPHERE);
-                this._scene.push(d.position.x);
-                this._scene.push(d.position.y);
-                this._scene.push(d.position.z);
-                this._scene.push(d.radius);
-                this._scene.push(d.color.r);
-                this._scene.push(d.color.g);
-                this._scene.push(d.color.b);
-                this._scene.push(d.emissive.r);
-                this._scene.push(d.emissive.g);
-                this._scene.push(d.emissive.b);
-                this._scene.push(d.reflectance);
-                this._scene.push(d.refractance);
+                let position = "vec3(" + d.position.x.toFixed(floatPrecision) + "," + d.position.y.toFixed(floatPrecision) + "," + d.position.z.toFixed(floatPrecision) + ")";
+
+                let color = "vec3(" + d.color.r.toFixed(floatPrecision) + "," + d.color.g.toFixed(floatPrecision) + "," + d.color.b.toFixed(floatPrecision) + ")";
+                let emissive = "vec3(" + d.emissive.r.toFixed(floatPrecision) + "," + d.emissive.g.toFixed(floatPrecision) + "," + d.emissive.b.toFixed(floatPrecision) + ")";
+
+                let material = "Material(" + color + ", " + emissive + ", " + d.reflectance.toFixed(floatPrecision) + ", " + d.refractance.toFixed(floatPrecision) +")";
+
+                this._scene += "spheres[" + sphereCount + "] = Sphere(" + position + ", " + d.radius.toFixed(floatPrecision) + ", " + material +");\n";
 
                 sphereCount ++;
             }
 
             if(d.constructor.name == "Plane")
             {
-                this._scene.push(PLANE);
-                this._scene.push(d.position.x);
-                this._scene.push(d.position.y);
-                this._scene.push(d.position.z);
-                this._scene.push(d.orientation.x);
-                this._scene.push(d.orientation.y);
-                this._scene.push(d.orientation.z);
-                this._scene.push(d.size);
-                this._scene.push(d.color.r);
-                this._scene.push(d.color.g);
-                this._scene.push(d.color.b);
-                this._scene.push(d.emissive.r);
-                this._scene.push(d.emissive.g);
-                this._scene.push(d.emissive.b);
-                this._scene.push(d.reflectance);
-                this._scene.push(d.refractance);
+                let position = "vec3(" + d.position.x.toFixed(floatPrecision) + "," + d.position.y.toFixed(floatPrecision) + "," + d.position.z.toFixed(floatPrecision) + ")";
+                let normal = "vec3(" + d.orientation.x.toFixed(floatPrecision) + "," + d.orientation.y.toFixed(floatPrecision) + "," + d.orientation.z.toFixed(floatPrecision) + ")";
+
+                let color = "vec3(" + d.color.r.toFixed(floatPrecision) + "," + d.color.g.toFixed(floatPrecision) + "," + d.color.b.toFixed(floatPrecision) + ")";
+                let emissive = "vec3(" + d.emissive.r.toFixed(floatPrecision) + "," + d.emissive.g.toFixed(floatPrecision) + "," + d.emissive.b.toFixed(floatPrecision) + ")";
+
+                let material = "Material(" + color + ", " + emissive + ", " + d.reflectance.toFixed(floatPrecision) + ", " + d.refractance.toFixed(floatPrecision) +")";
+
+                this._scene += "planes[" + planeCount + "] = Plane(" + position + ", " + normal + ", " + d.size.toFixed(floatPrecision) + ", " + material +");\n";
 
                 planeCount ++;
             }
         }, this);
-
-        //sphereCount = sphereCount == 0 ? 1 : sphereCount;
-        //planeCount = planeCount == 0 ? 1 : planeCount;
-
-        console.log(this._scene, planeCount, sphereCount);
 
         this._shaderConstants.SCENE_DATA_COUNT = sphereCount * 13 + planeCount * 16;
         this._shaderConstants.SPHERE_COUNT = sphereCount;
@@ -617,8 +555,6 @@ void main()
 
     recompileShaders()
     {
-
-        console.log(this.getFragmentSource());
 
         let vertexShader = this.gl.createShader(this.gl.VERTEX_SHADER);
         let fragmentShader = this.gl.createShader(this.gl.FRAGMENT_SHADER);
@@ -730,6 +666,7 @@ void main()
             this.fillMemory("height", this.canvas.height);
             this.fillMemory("random1", Math.random() * (1 + 1) - 1);
             this.fillMemory("random2", Math.random() * (1 + 1) - 1);
+            this.fillMemory("random3", Math.random() * (1 + 1) - 1);
             this.fillMemory("renderTime", this._renderTime, false);
 
             this.fillMemory("cameraRotationX", this.camera.rotation.x);
@@ -743,8 +680,6 @@ void main()
             this.fillMemory("backgrounColorR", this._backgroundColor.r);
             this.fillMemory("backgrounColorG", this._backgroundColor.g);
             this.fillMemory("backgrounColorB", this._backgroundColor.b);
-
-            this.SceneMemory();
         }
 
         parameters.call(this);
@@ -767,15 +702,6 @@ void main()
 
         // make sure it's a floating number
         this.gl.uniform1f(location, new Float32Array([value])[0]);
-    }
-
-    SceneMemory()
-    {
-        for(let i = 0; i < this._scene.length; i++)
-        {
-            let location = this.gl.getUniformLocation(this.program, "sceneData[" + i + "]");
-            this.gl.uniform1f(location, new Float32Array([this._scene[i]])[0]);
-        }
     }
 
     static initOpenGL(canvas)
