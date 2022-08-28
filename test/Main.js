@@ -34,7 +34,7 @@ export class Main
             renderer.camera.position.y = 1.0;
             renderer.camera.position.z = 5.0;
 
-            renderer.setBackgroundColor({r: 0.01, g: 0.01, b: 0.01});
+            renderer.setBackgroundColor({r: 0.0, g: 0.0, b: 0.0});
 
             renderer.addToScene(b1, b2, b3, b4, b5, b6, l1, l2, s1, s2);
         }
@@ -57,17 +57,23 @@ export class Main
             let l1 = new Laser({x: -1.99, y: -0.5, z: 0.0}, {x: 1.0, y: 0.0, z: 0.0}, {r: 1e200, g: 1e200, b: 1e200});
             let s1 = new Sphere({x: 0.0, y: -0.5, z: -0.30}, 0.5, {r: 0.7, g: 0.5, b: 0.5}, {r: 0.0, g: 0.0, b: 0.0}, 0.0, 1.0);
 
+            let b2 = new Plane({x: 0.0, y: 1.5, z: -2.0}, {x: 0.0, y: 0.0, z: 1.0}, 4.0, {r: 0.5, g: 0.5, b: 0.5}, {r: 0.0, g: 0.0, b: 0.0}, 0.0, 0.0);
+            let b3 = new Plane({x: 2.0, y: 1.5, z: 0.0}, {x: -1.0, y: 0.0, z: 0.0}, 4.0, {r: 0.5, g: 0.5, b: 0.5}, {r: 0.0, g: 0.0, b: 0.0}, 0.0, 0.0); 
+            let b4 = new Plane({x: -2.0, y: 1.5, z: 0.0}, {x: 1.0, y: 0.0, z: 0.0}, 4.0, {r: 0.5, g: 0.5, b: 0.5}, {r: 0.0, g: 0.0, b: 0.0}, 0.0, 0.0);
+            let b5 = new Plane({x: 0.0, y: 3.5, z: 0.0}, {x: 0.0, y: -1.0, z: 0.0}, 4.0, {r: 0.5, g: 0.5, b: 0.5}, {r: 0.0, g: 0.0, b: 0.0}, 0.0, 0.0);
+            let b6 = new Plane({x: 0.0, y: 1.5, z: 4.0}, {x: 0.0, y: 0.0, z: -1.0}, 4.0, {r: 0.5, g: 0.5, b: 0.5}, {r: 0.0, g: 0.0, b: 0.0}, 0.0, 0.0);
+
             renderer.camera.position.z = 2.0;
             renderer.camera.position.y = 1.0;
             renderer.camera.rotation.x = -35.0;
 
             renderer.setBackgroundColor({r: 0.01, g: 0.01, b: 0.01});
 
-            renderer.addToScene(b1, l1, s1);
+            renderer.addToScene(b1, l1, s1, b2, b3, b4, b5, b6);
             // renderer.setMaxBounces(10);
         }
 
-        refractionScene();
+        kernelBoxScene();
         
         function loop() 
         {

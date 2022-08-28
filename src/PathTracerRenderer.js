@@ -246,6 +246,11 @@ Sphere spheres[SPHERE_COUNT];
 Plane planes[PLANE_COUNT];
 Laser lasers[LASER_COUNT];
 
+vec3 nearestEmissivePosition;
+vec3 nearestEmissiveNormal;
+vec3 nearestEmissiveEmission;
+float nearestEmissiveDistance;
+
 float random(){
 
     float random1 = fract(sin(dot(rand.xy * random2, vec2(12.9898,78.233))) * 43758.5453123);
@@ -304,6 +309,11 @@ vec3 rayAt(Ray ray, float t)
 // TODO: Optimize time execution
 Hit rayHit(Ray ray)
 {
+
+    nearestEmissiveDistance = random();
+
+    vec3 cameraPosition = vec3(cameraPositionX, cameraPositionY, cameraPositionZ);
+
     bool hit;
     float hitT;
     vec3 hitPoint;
@@ -315,6 +325,18 @@ Hit rayHit(Ray ray)
 
     for(int i = 0; i < SPHERE_COUNT; i++)
     {
+        //nearest emissive
+        if(length(spheres[i].material.emissive) > 0.0)
+        {
+            if(random() < nearestEmissiveDistance)
+            {
+                nearestEmissiveDistance = random();
+                nearestEmissivePosition = spheres[i].center;
+                nearestEmissiveNormal = randomVec3();
+                nearestEmissiveEmission = spheres[i].material.emissive;
+            }
+        }
+
         vec3 distanceFromCenter = ray.origin - spheres[i].center;
 
         float b = 2.0 * dot(ray.direction, distanceFromCenter);
@@ -350,6 +372,17 @@ Hit rayHit(Ray ray)
 
     for(int i = 0; i < PLANE_COUNT; i++)
     {
+        //nearest emissive
+        if(length(planes[i].material.emissive) > 0.0)
+        {
+            if(random() < nearestEmissiveDistance)
+            {
+                nearestEmissiveDistance = random();
+                nearestEmissivePosition = planes[i].center;
+                nearestEmissiveNormal = planes[i].normal;
+                nearestEmissiveEmission = planes[i].material.emissive;
+            }
+        }
 
         vec3 normal = normalize(planes[i].normal);
 
@@ -403,6 +436,17 @@ Hit rayHit(Ray ray)
 
     for(int i = 0; i < LASER_COUNT; i++)
     {
+        //nearest emissive
+        if(length(lasers[i].material.emissive) > 0.0)
+        {
+            if(random() < nearestEmissiveDistance)
+            {
+                nearestEmissiveDistance = random();
+                nearestEmissivePosition = lasers[i].center;
+                nearestEmissiveNormal = lasers[i].normal;
+                nearestEmissiveEmission = lasers[i].material.emissive;
+            }
+        }
 
         vec3 normal = normalize(lasers[i].normal);
 
@@ -506,6 +550,8 @@ vec3 rayColor(Ray ray, float ir)
     vec3 color;
     color = vec3(1.0);
 
+    vec3 point;
+
     for(int i = 0; i < MAX_BOUNCE; i++)
     {
         Hit hit = rayHit(ray);
@@ -521,7 +567,7 @@ vec3 rayColor(Ray ray, float ir)
         {
             // light source
             color += hit.material.emissive;
-            break;
+            return color;
         }
 
         if(i == MAX_BOUNCE - 1)
@@ -531,7 +577,45 @@ vec3 rayColor(Ray ray, float ir)
 
         color *= hit.material.color;
 
+        point = hit.point;
+
         // change ray direction & origin
+        ray.origin = point;
+        ray.direction = getScatteredDirection(ray.direction, hit.normal, hit.material.reflection, hit.material.refraction, ir);
+    }
+
+    // bidirectional
+    ray.origin = nearestEmissivePosition;
+    ray.direction = nearestEmissiveNormal;
+    vec3 emissive = nearestEmissiveEmission;
+
+    const int LIGHT_MAX_BOUNCE = 5;
+
+    for(int i = 0; i < LIGHT_MAX_BOUNCE; i++)
+    {
+        if(i == LIGHT_MAX_BOUNCE - 1)
+        {
+            // last ray
+            ray.direction = normalize(point - ray.origin);
+
+            Hit hit = rayHit(ray);
+
+            if(abs(distance(hit.point, point)) >= EPSILON)
+            {
+                break;
+            }
+
+            color += emissive;
+            break;
+        }
+
+        Hit hit = rayHit(ray);
+
+        if(!hit.hit)
+        {
+            break;
+        }
+
         ray.origin = hit.point;
         ray.direction = getScatteredDirection(ray.direction, hit.normal, hit.material.reflection, hit.material.refraction, ir);
     }
@@ -709,8 +793,6 @@ void main()
                 let emissive = "vec3(" + d.emissive.r.toFixed(floatPrecision) + "," + d.emissive.g.toFixed(floatPrecision) + "," + d.emissive.b.toFixed(floatPrecision) + ")";
 
                 let material = "Material(" + color + ", " + emissive + ", 0.0, 0.0)";
-
-                console.log("lasers[" + laserCount + "] = Laser(" + position + ", " + normal + ", " + material +");\n");
 
                 this._scene += "lasers[" + laserCount + "] = Laser(" + position + ", " + normal + ", " + material +");\n";
 

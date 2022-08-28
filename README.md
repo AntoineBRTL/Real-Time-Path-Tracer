@@ -1,5 +1,5 @@
 # Real-Time Path-Tracer
-Fast high fidelity ray-tracing rendering program.
+Fast high fidelity spectral and bidirectonal path tracing rendering program.
 
 This program is written in Javascript and GLSL, and can be run in a browser or any browser-like libraries from Node-JS like [Electron](https://www.electronjs.org/).
 
