@@ -7,6 +7,7 @@
 import { PathTracerRenderer } from "../src/PathTracerRenderer.js";
 import { Sphere } from "../src/Sphere.js";
 import { Plane } from "../src/Plane.js";
+import { Laser } from "../src/Laser.js";
 
 export class Main
 {
@@ -17,7 +18,7 @@ export class Main
         
         let renderer = new PathTracerRenderer(canvas);
 
-        function kernelBox() {
+        function kernelBoxScene() {
             let s1 = new Sphere({x: -0.5, y: -0.2, z: 1.0}, 0.3, {r: 0.5, g: 0.5, b: 0.5}, {r: 0.0, g: 0.0, b: 0.0}, 0.0, 0.0);
             let s2 = new Sphere({x: 1.0, y: 0.0, z: -0.5}, 0.5, {r: 0.5, g: 0.5, b: 0.5}, {r: 0.0, g: 0.0, b: 0.0}, 1.0, 0.0);
     
@@ -39,7 +40,7 @@ export class Main
         }
 
         function basicScene() {
-            let s1 = new Sphere({x: 0.0, y: 0.0, z: 0.0}, 0.5, {r: 0.7, g: 0.5, b: 0.5}, {r: 0.0, g: 0.0, b: 0.0}, 0.0, 0.0);
+            let s1 = new Sphere({x: 0.0, y: 0.0, z: 0.0}, 0.5, {r: 0.7, g: 0.5, b: 0.5}, {r: 0.0, g: 0.0, b: 0.0}, 0.0, 1.0);
             let s2 = new Sphere({x: 0.0, y: -100.5, z: 0.5}, 100.0, {r: 0.5, g: 0.7, b: 0.5}, {r: 0.0, g: 0.0, b: 0.0}, 0.0, 0.0);
 
             renderer.camera.position.z = 2.0;
@@ -51,7 +52,22 @@ export class Main
             renderer.addToScene(s1, s2);
         }
 
-        kernelBox();
+        function refractionScene() {
+            let b1 = new Plane({x: 0.0, y: -0.5, z: 0.0}, {x: 0.0, y: 1.0, z: 0.0}, 4.0, {r: 0.5, g: 0.5, b: 0.5}, {r: 0.0, g: 0.0, b: 0.0}, 0.0, 0.0);
+            let l1 = new Laser({x: -1.99, y: -0.5, z: 0.0}, {x: 1.0, y: 0.0, z: 0.0}, {r: 1e200, g: 1e200, b: 1e200});
+            let s1 = new Sphere({x: 0.0, y: -0.5, z: -0.30}, 0.5, {r: 0.7, g: 0.5, b: 0.5}, {r: 0.0, g: 0.0, b: 0.0}, 0.0, 1.0);
+
+            renderer.camera.position.z = 2.0;
+            renderer.camera.position.y = 1.0;
+            renderer.camera.rotation.x = -35.0;
+
+            renderer.setBackgroundColor({r: 0.01, g: 0.01, b: 0.01});
+
+            renderer.addToScene(b1, l1, s1);
+            // renderer.setMaxBounces(10);
+        }
+
+        refractionScene();
         
         function loop() 
         {

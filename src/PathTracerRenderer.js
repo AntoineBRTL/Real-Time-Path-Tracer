@@ -91,6 +91,7 @@ export class PathTracerRenderer
             this._shaderConstants.SCENE_DATA_COUNT = 0;
             this._shaderConstants.SPHERE_COUNT = 0;
             this._shaderConstants.PLANE_COUNT = 0;
+            this._shaderConstants.LASER_COUNT = 0;
         }
         
         {
@@ -189,6 +190,13 @@ struct Plane
     Material material;
 };
 
+struct Laser
+{
+    vec3 center;
+    vec3 normal;
+    Material material;
+};
+
 struct Ray
 {
     vec3 origin;
@@ -230,11 +238,13 @@ uniform float backgrounColorB;
 
 const int SPHERE_COUNT = ` + Math.max(1, this._shaderConstants.SPHERE_COUNT) + `;
 const int PLANE_COUNT = ` + Math.max(1, this._shaderConstants.PLANE_COUNT) + `;
+const int LASER_COUNT = ` + Math.max(1, this._shaderConstants.LASER_COUNT) + `;
 const float EPSILON = 1e-5;
 const int MAX_BOUNCE = ` + this._shaderConstants.MAX_BOUNCES + `;
 
 Sphere spheres[SPHERE_COUNT];
 Plane planes[PLANE_COUNT];
+Laser lasers[LASER_COUNT];
 
 float random(){
 
@@ -340,6 +350,7 @@ Hit rayHit(Ray ray)
 
     for(int i = 0; i < PLANE_COUNT; i++)
     {
+
         vec3 normal = normalize(planes[i].normal);
 
         float denom = dot(-normal, ray.direction);
@@ -390,9 +401,57 @@ Hit rayHit(Ray ray)
         }
     }
 
-    /*// Volumes -> uniform
-    float density = abs(volumeDensity);
-    float t = (-1.0/density * (random()));
+    for(int i = 0; i < LASER_COUNT; i++)
+    {
+
+        vec3 normal = normalize(lasers[i].normal);
+
+        float co = length(cross(normal, normalize(ray.direction)));
+        if(!(co < 1e-2 && co > -1e-2))
+        {
+            continue;
+        }
+
+
+        float denom = dot(-normal, ray.direction);
+        if(denom <= 0.0)
+        {
+            continue;
+        }
+
+        float t = dot(lasers[i].center - ray.origin, -normal) / denom;
+
+        if(t <= -EPSILON)
+        {
+            // intersection behind the camera or too near
+            continue;
+        }
+
+        if(t < hitT)
+        {
+
+            vec3 point = rayAt(ray, t);
+
+            vec3 comp = lasers[i].center;
+
+            float radius = 0.01;
+
+            if(length(point - lasers[i].center) <= radius)
+            {
+                // nearest intersection
+                hit = true;
+                hitT = t;
+                hitMaterial = lasers[i].material;
+                hitPoint = point;
+                hitNormal = normalize(lasers[i].normal);
+            }
+        }
+    }
+
+    // Volumes -> uniform
+    /*float density = 2e2;
+    //float t = (-1.0/density * (random()));
+    float t = (random() / (density));
 
     // TODO: check range
     if(t > 0.0)
@@ -442,7 +501,7 @@ vec3 getScatteredDirection(vec3 i, vec3 n, float reflection, float refraction, f
     );
 }
 
-vec3 rayColor(Ray ray)
+vec3 rayColor(Ray ray, float ir)
 {
     vec3 color;
     color = vec3(1.0);
@@ -474,10 +533,33 @@ vec3 rayColor(Ray ray)
 
         // change ray direction & origin
         ray.origin = hit.point;
-        ray.direction = getScatteredDirection(ray.direction, hit.normal, hit.material.reflection, hit.material.refraction, 0.5);
+        ray.direction = getScatteredDirection(ray.direction, hit.normal, hit.material.reflection, hit.material.refraction, ir);
     }
 
     return color;
+}
+
+float spectralRayColor(Ray ray, vec3 sc)
+{
+    vec3 table = vec3(
+        600.0 * 10e-3,
+        550.0 * 10e-3,
+        450.0 * 10e-3
+    );
+
+    vec3 irs = vec3(
+        0.5,
+        1.0,
+        1.5
+    );
+
+    float a = 1.4580;
+    float b = 0.00354;
+    float ir = a + (b / pow(dot(table, sc), 2.0));
+
+    vec3 color = rayColor(ray, 1.0 / ir);
+
+    return dot(color, sc);
 }
 
 vec3 averageColor(vec3 color)
@@ -525,7 +607,13 @@ void main()
     
     `
     
-    vec3 color = rayColor(ray);
+    vec3 color = vec3(
+        spectralRayColor(ray, vec3(1.0, 0.0, 0.0)),
+        spectralRayColor(ray, vec3(0.0, 1.0, 0.0)),
+        spectralRayColor(ray, vec3(0.0, 0.0, 1.0))
+    );
+
+    //vec3 color = rayColor(ray, 0.5);
 
     if(renderTime > 0)
     {
@@ -577,6 +665,7 @@ void main()
 
         let sphereCount = 0;
         let planeCount = 0;
+        let laserCount = 0;
 
         let floatPrecision = 5;
 
@@ -610,11 +699,29 @@ void main()
 
                 planeCount ++;
             }
+
+            if(d.constructor.name == "Laser")
+            {
+                let position = "vec3(" + d.position.x.toFixed(floatPrecision) + "," + d.position.y.toFixed(floatPrecision) + "," + d.position.z.toFixed(floatPrecision) + ")";
+                let normal = "vec3(" + d.orientation.x.toFixed(floatPrecision) + "," + d.orientation.y.toFixed(floatPrecision) + "," + d.orientation.z.toFixed(floatPrecision) + ")";
+
+                let color = "vec3(1.0, 1.0, 1.0)";
+                let emissive = "vec3(" + d.emissive.r.toFixed(floatPrecision) + "," + d.emissive.g.toFixed(floatPrecision) + "," + d.emissive.b.toFixed(floatPrecision) + ")";
+
+                let material = "Material(" + color + ", " + emissive + ", 0.0, 0.0)";
+
+                console.log("lasers[" + laserCount + "] = Laser(" + position + ", " + normal + ", " + material +");\n");
+
+                this._scene += "lasers[" + laserCount + "] = Laser(" + position + ", " + normal + ", " + material +");\n";
+
+                laserCount ++;
+            }
         }, this);
 
         this._shaderConstants.SCENE_DATA_COUNT = sphereCount * 13 + planeCount * 16;
         this._shaderConstants.SPHERE_COUNT = sphereCount;
         this._shaderConstants.PLANE_COUNT = planeCount;
+        this._shaderConstants.LASER_COUNT = laserCount;
 
         this.recompileShaders();
         this.resetRenderChain();
