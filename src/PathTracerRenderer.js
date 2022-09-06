@@ -73,12 +73,13 @@ export class PathTracerRenderer
 
             // clone the canvas 
             this.renderingCanvas = document.createElement('canvas');
+
             this.renderingCanvas.width = this.postprocessingCanvas.width;
             this.renderingCanvas.height = this.postprocessingCanvas.height;
+
             window.addEventListener("resize", function(){
-                this.fcanvas.width = this.postprocessingCanvas.width;
-                this.fcanvas.height = this.postprocessingCanvas.height;
-                console.log("test");
+                this.renderingCanvas.width = this.postprocessingCanvas.width;
+                this.renderingCanvas.height = this.postprocessingCanvas.height;
             }.bind(this));
 
             this.gl = PathTracerRenderer.initOpenGL(this.renderingCanvas);
@@ -241,6 +242,7 @@ const int PLANE_COUNT = ` + Math.max(1, this._shaderConstants.PLANE_COUNT) + `;
 const int LASER_COUNT = ` + Math.max(1, this._shaderConstants.LASER_COUNT) + `;
 const float EPSILON = 1e-5;
 const int MAX_BOUNCE = ` + this._shaderConstants.MAX_BOUNCES + `;
+const int LIGHT_MAX_BOUNCE = 5;
 
 Sphere spheres[SPHERE_COUNT];
 Plane planes[PLANE_COUNT];
@@ -493,12 +495,12 @@ Hit rayHit(Ray ray)
     }
 
     // Volumes -> uniform
-    /*float density = 2e2;
+    float density = 10.0;
     //float t = (-1.0/density * (random()));
-    float t = (random() / (density));
+    float t = abs(random() * density);
 
     // TODO: check range
-    if(t > 0.0)
+    /*if(t > 0.0)
     {
         if(t < hitT)
         {
@@ -567,7 +569,7 @@ vec3 rayColor(Ray ray, float ir)
         {
             // light source
             color += hit.material.emissive;
-            return color;
+            break;
         }
 
         if(i == MAX_BOUNCE - 1)
@@ -589,8 +591,6 @@ vec3 rayColor(Ray ray, float ir)
     ray.direction = nearestEmissiveNormal;
     vec3 emissive = nearestEmissiveEmission;
 
-    const int LIGHT_MAX_BOUNCE = 5;
-
     for(int i = 0; i < LIGHT_MAX_BOUNCE; i++)
     {
         if(i == LIGHT_MAX_BOUNCE - 1)
@@ -600,20 +600,20 @@ vec3 rayColor(Ray ray, float ir)
 
             Hit hit = rayHit(ray);
 
-            if(abs(distance(hit.point, point)) >= EPSILON)
+            if(abs(distance(hit.point, point)) > 1e-16)
             {
-                break;
+                return color;
             }
 
             color += emissive;
-            break;
+            return color;
         }
 
         Hit hit = rayHit(ray);
 
         if(!hit.hit)
         {
-            break;
+            return color;
         }
 
         ray.origin = hit.point;
@@ -691,13 +691,13 @@ void main()
     
     `
     
-    vec3 color = vec3(
+    /*vec3 color = vec3(
         spectralRayColor(ray, vec3(1.0, 0.0, 0.0)),
         spectralRayColor(ray, vec3(0.0, 1.0, 0.0)),
         spectralRayColor(ray, vec3(0.0, 0.0, 1.0))
-    );
+    );*/
 
-    //vec3 color = rayColor(ray, 0.5);
+    vec3 color = rayColor(ray, 0.5);
 
     if(renderTime > 0)
     {
@@ -735,11 +735,66 @@ uniform sampler2D texture0;
 
 layout(location = 0) out vec4 out1;
 
+#define SAMPLES 20  // HIGHER = NICER = SLOWER
+#define DISTRIBUTION_BIAS 0.6 // between 0. and 1.
+#define PIXEL_MULTIPLIER  1.5 // between 1. and 3. (keep low)
+#define INVERSE_HUE_TOLERANCE 20.0 // (2. - 30.)
+
+#define GOLDEN_ANGLE 2.3999632 //3PI-sqrt(5)PI
+
+#define pow(a,b) pow(max(a,0.),b) // @morimea
+
+mat2 sample2D = mat2(cos(GOLDEN_ANGLE),sin(GOLDEN_ANGLE),-sin(GOLDEN_ANGLE),cos(GOLDEN_ANGLE));
+
+vec3 sirBirdDenoise(sampler2D imageTexture, in vec2 uv, in vec2 imageResolution) {
+    
+    vec3 denoisedColor           = vec3(0.);
+    
+    const float sampleRadius     = sqrt(float(SAMPLES));
+    const float sampleTrueRadius = 0.5/(sampleRadius*sampleRadius);
+    vec2        samplePixel      = vec2(1.0/imageResolution.x,1.0/imageResolution.y); 
+    vec3        sampleCenter     = texture(imageTexture, uv).rgb;
+    vec3        sampleCenterNorm = normalize(sampleCenter);
+    float       sampleCenterSat  = length(sampleCenter);
+    
+    float  influenceSum = 0.0;
+    float brightnessSum = 0.0;
+    
+    vec2 pixelRotated = vec2(0.,1.);
+    
+    for (float x = 0.0; x <= float(SAMPLES); x++) {
+        
+        pixelRotated *= sample2D;
+        
+        vec2  pixelOffset    = PIXEL_MULTIPLIER*pixelRotated*sqrt(x)*0.5;
+        float pixelInfluence = 1.0-sampleTrueRadius*pow(dot(pixelOffset,pixelOffset),DISTRIBUTION_BIAS);
+        pixelOffset *= samplePixel;
+            
+        vec3 thisDenoisedColor = 
+            texture(imageTexture, uv + pixelOffset).rgb;
+
+        pixelInfluence      *= pixelInfluence*pixelInfluence;
+        /*
+            HUE + SATURATION FILTER
+        */
+        pixelInfluence      *=   
+            pow(0.5+0.5*dot(sampleCenterNorm,normalize(thisDenoisedColor)),INVERSE_HUE_TOLERANCE)
+            * pow(1.0 - abs(length(thisDenoisedColor)-length(sampleCenterSat)),8.);
+            
+        influenceSum += pixelInfluence;
+        denoisedColor += thisDenoisedColor*pixelInfluence;
+    }
+    
+    return denoisedColor/influenceSum;
+    
+}
+
 void main()
 {
     vec2 uv = gl_FragCoord.xy / vec2(width, height);
 
     out1 = texture(texture0, uv);
+    //out1 = vec4(sirBirdDenoise(texture0, uv, vec2(width, height)), 1.0);
 }
 `;
     }
