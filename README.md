@@ -6,7 +6,7 @@ This program is written in Javascript and GLSL, and can be run in a browser or a
 No external libraries are needed to run this program.
 
 ## Try the demo
-1. Run `git clone git@github.com:AntoineBRTL/Real-Time-Path-Tracer.git .`.
+1. Run `git clone https://github.com/AntoineBRTL/Real-Time-Path-Tracer.git .`.
 2. Make sure your browser uses your main graphics card, see [here](https://superuser.com/questions/645918/how-to-run-google-chrome-with-nvidia-card-optimus).
 3. Open the [HTML](https://github.com/AntoineBRTL/Real-Time-Path-Tracer/blob/main/test/index.html) file in your browser.
 4. You may have to run a small server, see [here](https://www.npmjs.com/package/live-server).
