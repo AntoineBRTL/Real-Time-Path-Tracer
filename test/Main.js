@@ -165,7 +165,6 @@ export class Main
 window.onload = function()
 {
     new Main();
-    (new FPSMeter({ui: true})).start();
 }
 
 /**
