@@ -168,6 +168,15 @@ window.onload = function()
     (new FPSMeter({ui: true})).start();
 }
 
+/**
+ * 
+ * Little input system I've made for an old project.
+ * 
+ * It's not that hard to understand, I was really proud of me !
+ * But you can find way better libs on npm.
+ * 
+ */
+
 class Input{
 
     /**
@@ -195,19 +204,6 @@ class Input{
 
     static getKeyUp(keyValue){
         return hasValue(Input.KEY_UP, keyValue);
-    }
-
-    /**
-     * @param {String} axisName 
-     */
-    static getAxis(axisName){
-        if(axisName == "MouseX"){
-            return Input.MOUSE_MOVEMENT.x;
-        }
-
-        if(axisName == "MouseY"){
-            return Input.MOUSE_MOVEMENT.y;
-        }
     }
 
     /**
